@@ -10,8 +10,7 @@ try:
     print(f"Resultado da operação na GPU: {y}")
 
     # Verificando a GPU disponível
-    # print(f"Dispositivo ativo: {cp.cuda.runtime.getDevice()} - {cp.cuda.Device().name}")
-    print(f"Dispositivo ativo: {cp.cuda.runtime.getDevice()}")
+    print(f"Dispositivo ativo: {cp.cuda.Device()}")
     
 
 except cp.cuda.runtime.CUDARuntimeError as e:
