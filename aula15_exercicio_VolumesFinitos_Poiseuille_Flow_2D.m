@@ -12,17 +12,17 @@ clear; clc; close all; format short;
 %--------------------------------------------------------------------------
 %% Parametros de entrada do usuario
 %--------------------------------------------------------------------------
-L     =      2;  % Aproximadamente o comprimento do dominio [m]
-D     =   0.01;  % Diâmetro do canal [m]
-rho   =    1e3;  % Densidade da água [kg/m3]
-mu    = 8.9e-4;  % Viscosidade da água fluido [kg/m3]
-Gamma =   0.61/4200;  % Coeficiente de condução da água [W/(m K)]
-Pin   =      1;  % Pressão na entrada [Pa]   
-Pout  =      0;  % Pressão na saída [Pa]
-Tin   =     25;  % Temperatura de entrada [°C]
-Twall =    100;  % Temperatura das paredes [°C]
+L     =      2;  % Aproximadamente o comprimento do domÃ­nio [m]
+D     =   0.01;  % DiÃ¢metro do canal [m]
+rho   =    1e3;  % Densidade da Ã¡gua [kg/m3]
+mu    = 8.9e-4;  % Viscosidade da Ã¡gua fluido [kg/m3]
+Gamma =   0.61/4200;  % Coeficiente de conduÃ§Ã£o da Ã¡gua [W/(m K)]
+Pin   =      1;  % PressÃ£o na entrada [Pa]   
+Pout  =      0;  % PressÃ£o na saÃ­da [Pa]
+Tin   =     25;  % Temperatura de entrada [ÂºC]
+Twall =    100;  % Temperatura das paredes [ÂºC]
 
-nVolY =     15;  % Numero de volumes na direção y
+nVolY =     15;  % Numero de volumes na direÃ§Ã£o y
 %--------------------------------------------------------------------------
 
 %--------------------------------------------------------------------------
@@ -30,16 +30,16 @@ nVolY =     15;  % Numero de volumes na direção y
 %--------------------------------------------------------------------------
 R       = D/2;
 dx      = D/nVolY;
-y       = -R-dx/2:dx:R+dx/2;  % Leva-se em consideracao os volumes fantasmas
+y       = -R-dx/2:dx:R+dx/2;  % Leva-se em consideraÃ§Ã£o os volumes fantasmas
 
-nVolX   = round(L/dx);        % Adicao dos volumes fantasmas
+nVolX   = round(L/dx);        % AdiÃ§Ã£o dos volumes fantasmas
 L       = nVolX*dx;           % L deve ser proporcional a D
-x       = 0-dx/2:dx:L+dx/2;   % Leva-se em consideracao os volumes fantasmas
+x       = 0-dx/2:dx:L+dx/2;   % Leva-se em consideraÃ§Ã£o os volumes fantasmas
 
 nVolX   = nVolX+2;
 nVolY   = nVolY+2;
 
-[X,Y]   = meshgrid(x,y);    % Matrizes posicoes
+[X,Y]   = meshgrid(x,y);    % Matrizes posiÃ§Ãµes
 %--------------------------------------------------------------------------
 
 %--------------------------------------------------------------------------
@@ -188,7 +188,7 @@ hold on
 i = 2:nVolY-1; 
 j = 2:nVolX-1;
 contourf(X(i,j),Y(i,j),Vp(i,j),'EdgeColor','none');
-% axis equal; % Ajuste as proporções dos eixos
+% axis equal; % Ajuste as proporÃ§Ãµes dos eixos
 colorbar('location','EastOutside');
 xlim([0 L]);
 ylim([-R R]);
@@ -198,7 +198,7 @@ xlabel('x (m)');
 ylabel('y (m)');
 set(gcf,'color','w');
 
-% Ative shading interp para um gráfico mais suave
+% Ative shading interp para um grÃ¡fico mais suave
 shading interp;
 %--------------------------------------------------------------------------
 
@@ -209,7 +209,7 @@ hold on
 i = 2:nVolY-1; 
 j = 2:nVolX-1;
 contourf(X(i,j),Y(i,j),Vp(i,j),'EdgeColor','none');
-axis equal; % Ajuste as proporções dos eixos
+axis equal; % Ajuste as proporÃ§Ãµes dos eixos
 colorbar('location','EastOutside');
 xlim([0 L]);
 ylim([-R R]);
@@ -219,7 +219,7 @@ xlabel('x (m)');
 ylabel('y (m)');
 set(gcf,'color','w');
 
-% Ative shading interp para um gráfico mais suave
+% Ative shading interp para um grÃ¡fico mais suave
 shading interp;
 %--------------------------------------------------------------------------
 
@@ -230,18 +230,18 @@ j = 2:nVolX-1;
 PLOTVAR.figure	= figure;
 contourf(X(i,j),Y(i,j),phi.new(i,j),'EdgeColor','none');
 hold on
-% axis equal; % Ajuste as proporções dos eixos
+% axis equal; % Ajuste as proporÃ§Ãµes dos eixos
 colorbar('location','EastOutside');
 xlim([0 L]);
 ylim([-R R]);
 set(gcf,'color','w');
 xlabel('x (m)');
 ylabel('y (m)');
-title('Campo de Temperatura (°C)');
+title('Campo de Temperatura (ÂºC)');
 
 colormap(jet);
 
-% Ative shading interp para um gráfico mais suave
+% Ative shading interp para um grÃ¡fico mais suave
 shading interp;
 %--------------------------------------------------------------------------
 
@@ -252,17 +252,17 @@ j = 2:nVolX-1;
 PLOTVAR.figure	= figure;
 contourf(X(i,j),Y(i,j),phi.new(i,j),'EdgeColor','none');
 hold on
-axis equal; % Ajuste as proporções dos eixos
+axis equal; % Ajuste as proporÃ§Ãµes dos eixos
 colorbar('location','EastOutside');
 xlim([0 L]);
 ylim([-R R]);
 set(gcf,'color','w');
 xlabel('x (m)');
 ylabel('y (m)');
-title('Campo de Temperatura (°C)');
+title('Campo de Temperatura (ÂºC)');
 colormap(jet);
 
-% Ative shading interp para um gráfico mais suave
+% Ative shading interp para um grÃ¡fico mais suave
 shading interp;
 %--------------------------------------------------------------------------
 
@@ -270,23 +270,23 @@ shading interp;
 % Perfis de temperatura
 %--------------------------------------------------------------------------
 PLOTVAR.figure	= figure;
-    hold on; % Mantenha o gráfico para o próximo loop
+    hold on; % Mantenha o grÃ¡fico para o prÃ³ximo loop
 
 nPos = 5;
-% Defina as 5 posições de X para as quais você deseja plotar a variação de temperatura
-xPositions = linspace(0+dx,(L-dx),nPos); % substitua x1, x2, x3, x4, x5 pelas suas posições de X
+% Defina as 5 posiÃ§Ãµes de X para as quais vocÃª deseja plotar a variaÃ§Ã£o de temperatura
+xPositions = linspace(0+dx,(L-dx),nPos); % substitua x1, x2, x3, x4, x5 pelas suas posiÃ§Ãµes de X
 
 % Cores para as linhas
 colors = ['b', 'g', 'r', 'c', 'm']; % azul, verde, vermelho, ciano e magenta
 
-% Para cada posição de X, encontre a temperatura correspondente em todas as posições de Y
+% Para cada posiÃ§Ã£o de X, encontre a temperatura correspondente em todas as posiÃ§Ãµes de Y
 for i=1:nPos
     
-    % Encontre o índice de X mais próximo da posição atual de X
+    % Encontre o Ã­ndice de X mais prÃ³ximo da posiÃ§Ã£o atual de X
     distX = x-xPositions(i);
     [~,elemToPlot(i)] = min(abs(distX));
     
-    % Pegue a temperatura correspondente em todas as posições de Y
+    % Pegue a temperatura correspondente em todas as posiÃ§Ãµes de Y
     T2plot(:,i) = phi.new(2:end-1, elemToPlot(i));
         
     % Plote a temperatura versus Y
@@ -295,10 +295,10 @@ for i=1:nPos
     legendToPlot{i} = [ 'x = ' num2str(xPositions(i),2) ' m']; %#ok<*SAGROW>
 end
 
-xlabel('Temperatura (°C)');
+xlabel('Temperatura (ÂºC)');
 ylabel('y (m)');
 
-legend(legendToPlot{:}); % substitua x1, x2, x3, x4, x5 pelos seus rótulos desejados
+legend(legendToPlot{:}); % substitua x1, x2, x3, x4, x5 pelos seus rÃ³tulos desejados
 
 grid on;
 set(gca, 'GridLineStyle', '--', 'GridColor', 'k', 'GridAlpha', 0.5);
