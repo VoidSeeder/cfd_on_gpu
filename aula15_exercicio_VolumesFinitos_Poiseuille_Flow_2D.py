@@ -1,5 +1,6 @@
 import numpy as cp
-import matplotlib.pyplot as plt
+import time
+# import matplotlib.pyplot as plt
 
 # Configuração inicial
 L = 2.0  # Comprimento do domínio [m]
@@ -106,6 +107,8 @@ residuo_final = 1e-10
 
 print("=> Início das iterações")
 
+startTime = time.time()
+
 while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
     phi_old = phi_new.copy()
 
@@ -176,19 +179,22 @@ while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_itera
     numero_iteracao += 1
     print(f"=> Iteração: {numero_iteracao}, Resíduo = {residuo_iteracao}")
 
+endTime = time.time()
+
+print(f"Tempo de execução: {endTime - startTime} segundos")
 
 # Exibição dos resultados
-plt.figure()
-plt.contourf(
-    X[1:-1, 1:-1],
-    Y[1:-1, 1:-1],
-    phi_new[1:-1, 1:-1],
-    cmap="jet",
-)
-plt.colorbar(label="Temperatura (°C)")
-plt.title("Campo de Temperatura")
-plt.xlabel("x (m)")
-plt.ylabel("y (m)")
-plt.axis("equal")
-plt.savefig("campo_temperatura.png")
-print("=> Gráfico salvo como 'campo_temperatura.png'")
+# plt.figure()
+# plt.contourf(
+#     X[1:-1, 1:-1],
+#     Y[1:-1, 1:-1],
+#     phi_new[1:-1, 1:-1],
+#     cmap="jet",
+# )
+# plt.colorbar(label="Temperatura (°C)")
+# plt.title("Campo de Temperatura")
+# plt.xlabel("x (m)")
+# plt.ylabel("y (m)")
+# plt.axis("equal")
+# plt.savefig("campo_temperatura.png")
+# print("=> Gráfico salvo como 'campo_temperatura.png'")
