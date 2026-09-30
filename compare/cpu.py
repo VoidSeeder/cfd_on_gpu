@@ -1,4 +1,4 @@
-import numpy as cp
+import numpy as np
 import time
 # import matplotlib.pyplot as plt
 
@@ -21,16 +21,16 @@ def cpu_script(nVolY):
   # Configuração da malha
   R = D / 2
   dx = D / nVolY
-  y = cp.linspace(-R - dx / 2, R + dx / 2, nVolY + 2)
+  y = np.linspace(-R - dx / 2, R + dx / 2, nVolY + 2)
 
-  nVolX = int(cp.round(L / dx))
+  nVolX = int(np.round(L / dx))
   L = nVolX * dx
-  x = cp.linspace(0 - dx / 2, L + dx / 2, nVolX + 2)
+  x = np.linspace(0 - dx / 2, L + dx / 2, nVolX + 2)
 
   nVolX += 2
   nVolY += 2
 
-  X, Y = cp.meshgrid(x, y)
+  X, Y = np.meshgrid(x, y)
 
   # Campo de velocidade
   dPdx = (Pout - Pin) / L
@@ -43,20 +43,20 @@ def cpu_script(nVolY):
   ye = Y
   ue = 1 / (4 * mu) * (-dPdx) * (R**2 - ye**2)
 
-  vs = cp.zeros_like(Y)
-  vn = cp.zeros_like(Y)
+  vs = np.zeros_like(Y)
+  vn = np.zeros_like(Y)
 
   up = 1 / (4 * mu) * (-dPdx) * (R**2 - Y**2)
-  vp = cp.zeros_like(Y)
-  Vp = cp.sqrt(up**2 + vp**2)
+  vp = np.zeros_like(Y)
+  Vp = np.sqrt(up**2 + vp**2)
 
   # Coeficientes da equação de temperatura
-  Ap = cp.zeros((nVolY, nVolX))
-  Aw = cp.zeros((nVolY, nVolX))
-  Ae = cp.zeros((nVolY, nVolX))
-  As = cp.zeros((nVolY, nVolX))
-  An = cp.zeros((nVolY, nVolX))
-  Bp = cp.zeros((nVolY, nVolX))
+  Ap = np.zeros((nVolY, nVolX))
+  Aw = np.zeros((nVolY, nVolX))
+  Ae = np.zeros((nVolY, nVolX))
+  As = np.zeros((nVolY, nVolX))
+  An = np.zeros((nVolY, nVolX))
+  Bp = np.zeros((nVolY, nVolX))
 
   # Faces Oeste
   Ap[:, 0] = 1
@@ -91,16 +91,16 @@ def cpu_script(nVolY):
   Bp[-1, :] = 2 * Twall
 
   # Volumes internos
-  Ap[1:-1, 1:-1] = dx * rho * (- cp.minimum(0, uw[1:-1, 1:-1]) + cp.maximum(0, ue[1:-1, 1:-1]) - cp.minimum(0, vs[1:-1, 1:-1]) + cp.maximum(0, vn[1:-1, 1:-1])) + 4 * Gamma
+  Ap[1:-1, 1:-1] = dx * rho * (- np.minimum(0, uw[1:-1, 1:-1]) + np.maximum(0, ue[1:-1, 1:-1]) - np.minimum(0, vs[1:-1, 1:-1]) + np.maximum(0, vn[1:-1, 1:-1])) + 4 * Gamma
 
-  Aw[1:-1, 1:-1] = -dx * rho * cp.maximum(0, uw[1:-1, 1:-1]) - Gamma
-  Ae[1:-1, 1:-1] = dx * rho * cp.minimum(0, ue[1:-1, 1:-1]) - Gamma
-  As[1:-1, 1:-1] = -dx * rho * cp.maximum(0, vs[1:-1, 1:-1]) - Gamma
-  An[1:-1, 1:-1] = dx * rho * cp.minimum(0, vn[1:-1, 1:-1]) - Gamma
+  Aw[1:-1, 1:-1] = -dx * rho * np.maximum(0, uw[1:-1, 1:-1]) - Gamma
+  Ae[1:-1, 1:-1] = dx * rho * np.minimum(0, ue[1:-1, 1:-1]) - Gamma
+  As[1:-1, 1:-1] = -dx * rho * np.maximum(0, vs[1:-1, 1:-1]) - Gamma
+  An[1:-1, 1:-1] = dx * rho * np.minimum(0, vn[1:-1, 1:-1]) - Gamma
   Bp[1:-1, 1:-1] = 0
 
   # Solução inicial de phi
-  phi_new = cp.zeros((nVolY, nVolX))
+  phi_new = np.zeros((nVolY, nVolX))
 
   # Resolução do sistema linear
   residuo_iteracao = 1
@@ -175,7 +175,7 @@ def cpu_script(nVolY):
           - An[1:-1, 1:-1] * phi_new[2:, 1:-1]
           + Bp[1:-1, 1:-1]) / Ap[1:-1, 1:-1]
               
-      residuo_iteracao = cp.sum(cp.abs(phi_new - phi_old)) / cp.sum(cp.abs(phi_new))
+      residuo_iteracao = np.sum(np.abs(phi_new - phi_old)) / np.sum(np.abs(phi_new))
       numero_iteracao += 1
       # print(f"=> Iteração: {numero_iteracao}, Resíduo = {residuo_iteracao}")
 
