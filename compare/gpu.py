@@ -101,7 +101,7 @@ def gpu_script(nVolY):
   Bp[1:-1, 1:-1] = 0
 
   # Solução inicial de phi
-  phi_new = cp.ones((nVolY, nVolX))
+  phi_new = cp.zeros((nVolY, nVolX))
 
   # Resolução do sistema linear
   residuo_iteracao = 1
@@ -109,13 +109,16 @@ def gpu_script(nVolY):
   numero_maximo_iteracao = 100
   residuo_final = 1e-10
 
+  # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
+  b = Bp.copy()
+  b[::nVolY - 1, ::nVolX - 1] = 0
+  norma_b = cp.linalg.norm(b)
+
   # print("=> Início das iterações")
 
   start_iteration_time = time.time()
 
   while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
-      phi_old = phi_new.copy()
-      
       # Atualiza as bordas Oeste
       phi_new[1:-1, 0] = (
           - Ae[1:-1, 0] * phi_new[1:-1, 1]
@@ -159,7 +162,15 @@ def gpu_script(nVolY):
               Bp[1:-1, 1:-1]),
           Ap[1:-1, 1:-1])
               
-      residuo_iteracao = cp.sum(cp.abs(phi_new - phi_old)) / cp.sum(cp.abs(phi_new))
+      # Resíduo real do sistema linear: ||b - A*phi|| / ||b||
+      res = Bp - Ap * phi_new
+      res[:, 1:] -= Aw[:, 1:] * phi_new[:, :-1]
+      res[:, :-1] -= Ae[:, :-1] * phi_new[:, 1:]
+      res[1:, :] -= As[1:, :] * phi_new[:-1, :]
+      res[:-1, :] -= An[:-1, :] * phi_new[1:, :]
+      res[::nVolY - 1, ::nVolX - 1] = 0
+
+      residuo_iteracao = cp.linalg.norm(res) / norma_b
       numero_iteracao += 1
       # print(f"=> Iteração: {numero_iteracao}, Resíduo = {residuo_iteracao}")
 

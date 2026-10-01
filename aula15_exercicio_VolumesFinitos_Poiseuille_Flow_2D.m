@@ -131,12 +131,15 @@ numeroIteracao       = 0;
 numeroMaximoIteracao = 10000;
 residuoFinal         = 1e-10;
 
+% Norma do termo fonte (os cantos fantasmas nao fazem parte do sistema)
+b                    = Bp;
+b([1 end],[1 end])   = 0;
+normaB               = norm(b(:));
+
 disp('=> Inicio das iteracoes');
 
 while (residuoIteracao > residuoFinal) && (numeroIteracao < numeroMaximoIteracao)
     
-    phi.old = phi.new;
-
     % Face oeste
     for i = 2:nVolY-1
         j = 1;
@@ -168,7 +171,15 @@ while (residuoIteracao > residuoFinal) && (numeroIteracao < numeroMaximoIteracao
         end
     end
     
-    residuoIteracao = sum(sum(abs(phi.new -phi.old)))/sum(sum(abs(phi.new)));
+    % Residuo real do sistema linear: ||b - A*phi|| / ||b||
+    res                  = Bp - Ap.*phi.new;
+    res(:,2:end)         = res(:,2:end)   - Aw(:,2:end)  .*phi.new(:,1:end-1);
+    res(:,1:end-1)       = res(:,1:end-1) - Ae(:,1:end-1).*phi.new(:,2:end);
+    res(2:end,:)         = res(2:end,:)   - As(2:end,:)  .*phi.new(1:end-1,:);
+    res(1:end-1,:)       = res(1:end-1,:) - An(1:end-1,:).*phi.new(2:end,:);
+    res([1 end],[1 end]) = 0;
+
+    residuoIteracao = norm(res(:))/normaB;
     numeroIteracao  = numeroIteracao + 1;
     
     disp(['=> Iteracao: ',num2str(numeroIteracao),' Residuo = ',num2str(residuoIteracao)]);
