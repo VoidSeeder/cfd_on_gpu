@@ -3,9 +3,6 @@
 %% Exercicio
 %==========================================================================
 % Autor: Joao Rodrigo Andrade
-%
-% Codigo original em MATLAB (matlab_version.m). Unica adaptacao para o Octave: nas chamadas
-% de contourf, 'EdgeColor','none' virou 'LineStyle','none'.
 %==========================================================================
 
 %--------------------------------------------------------------------------
@@ -190,7 +187,7 @@ PLOTVAR.figure	= figure;
 hold on
 i = 2:nVolY-1; 
 j = 2:nVolX-1;
-contourf(X(i,j),Y(i,j),Vp(i,j),'LineStyle','none');
+contourf(X(i,j),Y(i,j),Vp(i,j),'EdgeColor','none');
 % axis equal; % Ajuste as proporções dos eixos
 colorbar('location','EastOutside');
 xlim([0 L]);
@@ -211,7 +208,7 @@ PLOTVAR.figure	= figure;
 hold on
 i = 2:nVolY-1; 
 j = 2:nVolX-1;
-contourf(X(i,j),Y(i,j),Vp(i,j),'LineStyle','none');
+contourf(X(i,j),Y(i,j),Vp(i,j),'EdgeColor','none');
 axis equal; % Ajuste as proporções dos eixos
 colorbar('location','EastOutside');
 xlim([0 L]);
@@ -231,7 +228,7 @@ shading interp;
 i = 2:nVolY-1; 
 j = 2:nVolX-1;
 PLOTVAR.figure	= figure;
-contourf(X(i,j),Y(i,j),phi.new(i,j),'LineStyle','none');
+contourf(X(i,j),Y(i,j),phi.new(i,j),'EdgeColor','none');
 hold on
 % axis equal; % Ajuste as proporções dos eixos
 colorbar('location','EastOutside');
@@ -253,7 +250,7 @@ shading interp;
 i = 2:nVolY-1; 
 j = 2:nVolX-1;
 PLOTVAR.figure	= figure;
-contourf(X(i,j),Y(i,j),phi.new(i,j),'LineStyle','none');
+contourf(X(i,j),Y(i,j),phi.new(i,j),'EdgeColor','none');
 hold on
 axis equal; % Ajuste as proporções dos eixos
 colorbar('location','EastOutside');

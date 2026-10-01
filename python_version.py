@@ -4,7 +4,7 @@
 #==========================================================================
 # Autor: Joao Rodrigo Andrade
 #
-# Tradução linha a linha do código original em MATLAB (octave_version.m).
+# Tradução linha a linha do código original em MATLAB (matlab_version.m).
 # Mesmo método (Gauss-Seidel com laços), mesmo critério de parada e mesma
 # ordem de varredura. Diferenças inevitáveis da linguagem:
 #   - índices começam em 0, e os intervalos 2:n-1 viram range(1, n-1);
