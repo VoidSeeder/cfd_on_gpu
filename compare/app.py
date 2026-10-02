@@ -4,9 +4,12 @@ import gc
 import cupy as cp
 import time
 
+# Estudo com número fixo de iterações: mede o custo por iteração, não o tempo até convergir
+numero_iteracoes = 100
+
 # Rodada de aquecimento, descartada: a primeira chamada à GPU no processo
 # inclui a compilação dos kernels do CuPy
-gpu_script(nVolY=50)
+gpu_script(nVolY=50, numero_maximo_iteracao=numero_iteracoes)
 
 for i in range(5):
   cpu_file_name = f"cpu_times_{i + 1}.txt"
@@ -21,7 +24,7 @@ for i in range(5):
   print("Inicio com CPU")
 
   for nVolY in range(50, 610, 50):
-    cpu_time = cpu_script(nVolY=nVolY)
+    cpu_time = cpu_script(nVolY=nVolY, numero_maximo_iteracao=numero_iteracoes)
     
     print(f"{nVolY} {cpu_time["allocation"]:.6f} {cpu_time["iteration"]:.6f}\n")
     
@@ -45,7 +48,7 @@ for i in range(5):
   gpu_file.close()
 
   for nVolY in range(50, 610, 50):
-    gpu_time = gpu_script(nVolY=nVolY)
+    gpu_time = gpu_script(nVolY=nVolY, numero_maximo_iteracao=numero_iteracoes)
     
     print(f"{nVolY} {gpu_time["allocation"]:.6f} {gpu_time["iteration"]:.6f}\n")
     

@@ -2,7 +2,7 @@ import numpy as np
 import time
 # import matplotlib.pyplot as plt
 
-def cpu_script(nVolY):
+def cpu_script(nVolY, numero_maximo_iteracao=1000000):
   start_allocation_time = time.perf_counter()
   
   # Configuração inicial
@@ -105,7 +105,6 @@ def cpu_script(nVolY):
   # Resolução do sistema linear
   residuo_iteracao = 1
   numero_iteracao = 0
-  numero_maximo_iteracao = 100
   residuo_final = 1e-10
 
   # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
@@ -194,7 +193,8 @@ def cpu_script(nVolY):
 
   # print(f"Tempo de execução: {endTime - startTime} segundos")
   
-  return {"allocation": start_iteration_time - start_allocation_time, "iteration": end_time - start_iteration_time}
+  return {"allocation": start_iteration_time - start_allocation_time, "iteration": end_time - start_iteration_time,
+          "iterations": numero_iteracao, "converged": bool(residuo_iteracao <= residuo_final)}
 
   # Exibição dos resultados
   # plt.figure()
