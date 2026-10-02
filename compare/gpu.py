@@ -4,7 +4,9 @@ import argparse
 # import matplotlib.pyplot as plt
 
 def gpu_script(nVolY):
-  start_allocation_time = time.time()
+  # A GPU executa de forma assíncrona: espera terminar antes de marcar o tempo
+  cp.cuda.Device().synchronize()
+  start_allocation_time = time.perf_counter()
   
   # Configuração inicial
   L = 2.0  # Comprimento do domínio [m]
@@ -116,7 +118,8 @@ def gpu_script(nVolY):
 
   # print("=> Início das iterações")
 
-  start_iteration_time = time.time()
+  cp.cuda.Device().synchronize()
+  start_iteration_time = time.perf_counter()
 
   while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
       # Atualiza as bordas Oeste
@@ -174,7 +177,8 @@ def gpu_script(nVolY):
       numero_iteracao += 1
       # print(f"=> Iteração: {numero_iteracao}, Resíduo = {residuo_iteracao}")
 
-  end_time = time.time()
+  cp.cuda.Device().synchronize()
+  end_time = time.perf_counter()
 
   print(f"Tempo de execução: {end_time - start_iteration_time} segundos")
   
