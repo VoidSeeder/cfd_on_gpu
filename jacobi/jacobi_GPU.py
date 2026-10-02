@@ -102,7 +102,7 @@ phi_new = cp.zeros((nVolY, nVolX))
 # Resolução do sistema linear
 residuo_iteracao = 1
 numero_iteracao = 0
-numero_maximo_iteracao = 100
+numero_maximo_iteracao = 1000000
 residuo_final = 1e-10
 
 # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
