@@ -4,6 +4,10 @@ import gc
 import cupy as cp
 import time
 
+# Rodada de aquecimento, descartada: a primeira chamada à GPU no processo
+# inclui a compilação dos kernels do CuPy
+gpu_script(nVolY=50)
+
 for i in range(5):
   cpu_file_name = f"cpu_times_{i + 1}.txt"
 
