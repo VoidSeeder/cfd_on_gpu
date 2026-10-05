@@ -6,18 +6,20 @@ import platform
 import subprocess
 import sys
 
-# Executa o script de um método, em CPU ou GPU, para valores crescentes de
-# nVolY, com várias repetições por malha, e grava os tempos em um arquivo.
+# Executa o script de um método, em CPU ou GPU e em uma das abordagens, para
+# valores crescentes de nVolY, com várias repetições por malha, e grava os
+# tempos em um arquivo.
 # Cada execução é um processo novo do script do método, que informa o próprio
 # tempo na linha "=> Resultado: ..."
 #
-# Exemplo: python executa.py jacobi GPU --inicio 20 --fim 100 --passo 20
+# Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
 metodos = ["jacobi", "gauss_seidel_red_black", "successive_over_relaxation_red_black"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("metodo", choices=metodos)
 parser.add_argument("plataforma", choices=["CPU", "GPU"])
+parser.add_argument("abordagem", choices=["numpy", "cupy", "numba"])
 parser.add_argument("--inicio", type=int, required=True, help="primeiro nVolY")
 parser.add_argument("--fim", type=int, required=True, help="último nVolY")
 parser.add_argument("--passo", type=int, required=True, help="incremento do nVolY")
@@ -26,7 +28,10 @@ parser.add_argument("--saida", default=".", help="pasta do arquivo de saída")
 args = parser.parse_args()
 
 raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}.py")
+script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}_{args.abordagem}.py")
+
+if not os.path.exists(script):
+  parser.error(f"não existe o script {os.path.relpath(script, raiz)}")
 
 def saida_de(comando):
   try:
@@ -41,7 +46,7 @@ inicio = datetime.datetime.now()
 
 os.makedirs(args.saida, exist_ok=True)
 
-file_name = os.path.join(args.saida, f"{args.metodo}_{args.plataforma}_{inicio:%Y%m%d_%H%M%S}.txt")
+file_name = os.path.join(args.saida, f"{args.metodo}_{args.plataforma}_{args.abordagem}_{inicio:%Y%m%d_%H%M%S}.txt")
 
 # Modo "x": uma execução nova nunca sobrescreve um arquivo existente
 file = open(file_name, "xt")
@@ -57,11 +62,11 @@ file.write(f"# Pacotes: {', '.join(sorted(f'{d.name}=={d.version}' for d in impo
 file.write(f"# GPU: {saida_de(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'])}\n")
 
 # Limite de threads das bibliotecas numéricas (vazio = padrão da biblioteca)
-for variavel in ["OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"]:
+for variavel in ["OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMBA_NUM_THREADS"]:
   file.write(f"# {variavel}: {os.environ.get(variavel, '')}\n")
 
 file.write("\n")
-file.write("nVolY - Repeticao - Alocacao - Iteracoes - Numero de iteracoes - Residuo - Estado\n")
+file.write("nVolY - Repeticao - Alocacao - Iteracoes - Numero de iteracoes - Residuo - Estado - Aquecimento - Threads\n")
 file.write("\n")
 
 file.close()
@@ -76,7 +81,7 @@ for nVolY in range(args.inicio, args.fim + 1, args.passo):
       # "=> Resultado: nVolY=20 alocacao=0.01 ..." vira um dicionário
       campos = dict(campo.split("=") for campo in resultado[0].split()[2:])
 
-      linha = f"{nVolY} {repeticao} {campos['alocacao']} {campos['iteracao']} {campos['numero_iteracao']} {campos['residuo']} {campos['estado']}\n"
+      linha = f"{nVolY} {repeticao} {campos['alocacao']} {campos['iteracao']} {campos['numero_iteracao']} {campos['residuo']} {campos['estado']} {campos.get('aquecimento', '-')} {campos.get('threads', '-')}\n"
     else:
       # Execução que termina sem resultado (por exemplo, falta de memória)
       linha = f"{nVolY} {repeticao} erro: {execucao.stderr.strip().splitlines()[-1:]}\n"
