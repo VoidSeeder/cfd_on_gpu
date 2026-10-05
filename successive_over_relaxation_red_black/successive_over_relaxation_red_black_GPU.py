@@ -1,6 +1,11 @@
 import cupy as cp
+import sys
 import time
 # import matplotlib.pyplot as plt
+
+# Início da medição do tempo de alocação
+cp.cuda.Device().synchronize()
+start_allocation_time = time.perf_counter()
 
 # Configuração inicial
 L = 2.0  # Comprimento do domínio [m]
@@ -13,7 +18,8 @@ Pout = 0.0  # Pressão na saída [Pa]
 Tin = 25.0  # Temperatura de entrada [°C]
 Twall = 100.0  # Temperatura nas paredes [°C]
 
-nVolY = 400  # Número de volumes na direção y
+# Número de volumes na direção y (primeiro argumento da linha de comando)
+nVolY = int(sys.argv[1]) if len(sys.argv) > 1 else 400
 
 # Configuração da malha
 R = D / 2
@@ -113,7 +119,12 @@ norma_b = cp.linalg.norm(b)
 
 print("=> Início das iterações")
 
-startTime = time.time()
+# A primeira iteração serve de aquecimento e é descartada
+aquecimento = True
+
+cp.cuda.Device().synchronize()
+end_allocation_time = time.perf_counter()
+start_iteration_time = end_allocation_time
 
 while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
     # Volumes vermelhos (i + j par) e depois pretos (i + j ímpar).
@@ -176,11 +187,28 @@ while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_itera
 
     residuo_iteracao = cp.linalg.norm(res) / norma_b
     numero_iteracao += 1
-    print(f"=> Iteração: {numero_iteracao}, Resíduo = {residuo_iteracao}")
 
-endTime = time.time()
+    # Aquecimento: a primeira iteração do processo inclui a compilação dos
+    # kernels do CuPy. Ela é descartada e o relógio das iterações recomeça
+    if aquecimento:
+        aquecimento = False
+        phi_new[:] = 0
+        residuo_iteracao = 1
+        numero_iteracao = 0
+        cp.cuda.Device().synchronize()
+        start_iteration_time = time.perf_counter()
 
-print(f"Tempo de execução: {endTime - startTime} segundos")
+cp.cuda.Device().synchronize()
+end_time = time.perf_counter()
+
+estado = "convergiu" if residuo_iteracao <= residuo_final else "nao_convergiu"
+
+print(f"=> Resultado: nVolY={nVolY - 2}"
+      f" alocacao={end_allocation_time - start_allocation_time:.6f}"
+      f" iteracao={end_time - start_iteration_time:.6f}"
+      f" numero_iteracao={numero_iteracao}"
+      f" residuo={float(residuo_iteracao):.6e}"
+      f" estado={estado}")
 
 # Exibição dos resultados
 # plt.figure()
