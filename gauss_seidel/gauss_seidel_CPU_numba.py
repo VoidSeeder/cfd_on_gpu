@@ -1,13 +1,15 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange, get_num_threads
 import sys
 import time
 # import matplotlib.pyplot as plt
 
-# Uma iteração do método, compilada pelo Numba. A varredura é serial: cada
-# volume usa os vizinhos já atualizados na mesma iteração, então a ordem
-# importa e as linhas não podem ser divididas entre threads
-@njit
+# Uma iteração do método, compilada pelo Numba. Cada volume usa os vizinhos
+# Oeste e Sul já atualizados na mesma iteração, então a ordem importa e as
+# linhas não podem ser simplesmente divididas entre as threads. Os internos
+# são divididos em blocos, e só os blocos que não dependem uns dos outros
+# rodam ao mesmo tempo (NUMBA_NUM_THREADS; sem a variável, todas)
+@njit(parallel=True)
 def iteracao(Ap, Aw, Ae, As, An, Bp, phi_new, norma_b):
     nVolY, nVolX = phi_new.shape
 
@@ -51,21 +53,37 @@ def iteracao(Ap, Aw, Ae, As, An, Bp, phi_new, norma_b):
             + Bp[i, j]
         ) / Ap[i, j]
 
-    # Volumes internos: um vetor só, percorrido linha a linha. Os vizinhos
-    # Oeste e Sul já são os da iteração atual (Gauss-Seidel lexicográfico)
-    for i in range(1, nVolY - 1):
-        for j in range(1, nVolX - 1):
-            phi_new[i, j] = (- Aw[i, j] * phi_new[i, j - 1]
-                - Ae[i, j] * phi_new[i, j + 1]
-                - As[i, j] * phi_new[i - 1, j]
-                - An[i, j] * phi_new[i + 1, j]
-                + Bp[i, j]) / Ap[i, j]
+    # Volumes internos: um vetor só. Os vizinhos Oeste e Sul já são os da
+    # iteração atual (Gauss-Seidel lexicográfico). A malha é dividida em
+    # blocos: uma faixa de linhas por thread e trechos de 250 colunas. O bloco
+    # (r, c) só depende do bloco ao Sul (r - 1, c) e do bloco a Oeste
+    # (r, c - 1), então os blocos de uma mesma diagonal (r + c constante) não
+    # dependem uns dos outros. As diagonais são percorridas em ordem e, dentro
+    # do bloco, a varredura é linha a linha: cada volume recebe o mesmo valor
+    # da varredura serial
+    altura = (nVolY - 2 + get_num_threads() - 1) // get_num_threads()
+    largura = 250
+
+    n_faixas = (nVolY - 2 + altura - 1) // altura
+    n_trechos = (nVolX - 2 + largura - 1) // largura
+
+    for d in range(n_faixas + n_trechos - 1):
+        for r in prange(max(0, d - (n_trechos - 1)), min(n_faixas - 1, d) + 1):
+            c = d - r
+
+            for i in range(1 + r * altura, min(nVolY - 1, 1 + (r + 1) * altura)):
+                for j in range(1 + c * largura, min(nVolX - 1, 1 + (c + 1) * largura)):
+                    phi_new[i, j] = (- Aw[i, j] * phi_new[i, j - 1]
+                        - Ae[i, j] * phi_new[i, j + 1]
+                        - As[i, j] * phi_new[i - 1, j]
+                        - An[i, j] * phi_new[i + 1, j]
+                        + Bp[i, j]) / Ap[i, j]
 
     # Resíduo real do sistema linear: ||b - A*phi|| / ||b||
     # (os cantos fantasmas não fazem parte do sistema)
     soma = 0.0
 
-    for i in range(nVolY):
+    for i in prange(nVolY):
         for j in range(nVolX):
             if (i == 0 or i == nVolY - 1) and (j == 0 or j == nVolX - 1):
                 continue
@@ -231,7 +249,7 @@ print(f"=> Resultado: nVolY={nVolY - 2}"
       f" residuo={float(residuo_iteracao):.6e}"
       f" estado={estado}"
       f" aquecimento={end_warm_up_time - end_allocation_time:.6f}"
-      f" threads=1")
+      f" threads={get_num_threads()}")
 
 # Exibição dos resultados
 # plt.figure()
