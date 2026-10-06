@@ -8,7 +8,7 @@ import time
 # varredura é a do Gauss-Seidel lexicográfico: as faces primeiro e depois os
 # volumes internos, linha a linha. Na GPU os internos são percorridos por
 # diagonais (i + j constante), o que dá os mesmos valores da varredura linha
-# a linha e deixa cada thread calcular um volume
+# a linha e deixa as threads calcularem em paralelo os volumes de uma diagonal
 
 # Faces: a thread k calcula as faces Oeste e Leste da linha k e as faces Sul e
 # Norte da coluna k. Cada face só depende do volume interno vizinho (os
@@ -58,26 +58,32 @@ def bordas(Ap, Aw, Ae, As, An, Bp, phi_new):
             + Bp[i, j]
         ) / Ap[i, j]
 
-# Volumes internos de uma diagonal (i + j = d): a thread k calcula o k-ésimo
-# volume da diagonal. Os vizinhos Oeste e Sul estão na diagonal d - 1, já
-# atualizada na iteração atual, e os vizinhos Leste e Norte na diagonal d + 1,
-# ainda da iteração anterior, como na varredura linha a linha. Os volumes de
-# uma mesma diagonal não dependem uns dos outros
+# Volumes internos, todas as diagonais (i + j = d) em uma chamada: um bloco só
+# de threads, em que a thread k calcula o k-ésimo volume de cada diagonal. Os
+# vizinhos Oeste e Sul estão na diagonal d - 1, já atualizada na iteração
+# atual, e os vizinhos Leste e Norte na diagonal d + 1, ainda da iteração
+# anterior, como na varredura linha a linha. Os volumes de uma mesma diagonal
+# não dependem uns dos outros, e a barreira no fim do laço garante que a
+# diagonal d termina antes de a d + 1 começar
 @cuda.jit
-def diagonal(Ap, Aw, Ae, As, An, Bp, phi_new, d):
+def internos(Ap, Aw, Ae, As, An, Bp, phi_new):
     nVolY, nVolX = phi_new.shape
-    k = cuda.grid(1)
-    i = max(1, d - (nVolX - 2)) + k
-    j = d - i
+    k = cuda.threadIdx.x
 
-    if i < nVolY - 1 and j >= 1:
-        phi_new[i, j] = (
-            - Aw[i, j] * phi_new[i, j - 1]
-            - Ae[i, j] * phi_new[i, j + 1]
-            - As[i, j] * phi_new[i - 1, j]
-            - An[i, j] * phi_new[i + 1, j]
-            + Bp[i, j]
-        ) / Ap[i, j]
+    for d in range(2, nVolY + nVolX - 3):
+        i = max(1, d - (nVolX - 2)) + k
+        j = d - i
+
+        if i < nVolY - 1 and j >= 1:
+            phi_new[i, j] = (
+                - Aw[i, j] * phi_new[i, j - 1]
+                - Ae[i, j] * phi_new[i, j + 1]
+                - As[i, j] * phi_new[i - 1, j]
+                - An[i, j] * phi_new[i + 1, j]
+                + Bp[i, j]
+            ) / Ap[i, j]
+
+        cuda.syncthreads()
 
 # Resíduo real do sistema linear, b - A*phi: a thread j soma os quadrados do
 # resíduo dos volumes da coluna j (os cantos fantasmas não fazem parte do
@@ -240,12 +246,14 @@ soma_coluna_gpu = cuda.device_array(nVolX)
 soma_coluna = np.zeros(nVolX)
 
 # Divisão das threads da GPU em blocos, sempre em uma dimensão: nas bordas e
-# no resíduo, uma thread por linha ou coluna; nos volumes internos, uma thread
-# por volume da diagonal (uma diagonal tem no máximo min(nVolX, nVolY) - 2
-# volumes)
+# no resíduo, uma thread por linha ou coluna
 threads_1d = 256
 blocos_1d = (max(nVolX, nVolY) + threads_1d - 1) // threads_1d
-blocos_diagonal = (min(nVolX, nVolY) - 2 + threads_1d - 1) // threads_1d
+
+# Nos volumes internos, um bloco só, com uma thread por volume da maior
+# diagonal (a barreira entre diagonais só vale dentro de um bloco, e um bloco
+# tem no máximo 1024 threads)
+threads_diagonal = min(nVolX, nVolY) - 2
 
 print("=> Início das iterações")
 
@@ -259,10 +267,7 @@ start_iteration_time = end_allocation_time
 while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
     bordas[blocos_1d, threads_1d](Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_new_gpu)
 
-    # Volumes internos: uma chamada do kernel por diagonal, da primeira
-    # (i = 1, j = 1) à última (i = nVolY - 2, j = nVolX - 2)
-    for d in range(2, nVolY + nVolX - 3):
-        diagonal[blocos_diagonal, threads_1d](Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_new_gpu, d)
+    internos[1, threads_diagonal](Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_new_gpu)
 
     residuo[blocos_1d, threads_1d](Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_new_gpu, soma_coluna_gpu)
 
