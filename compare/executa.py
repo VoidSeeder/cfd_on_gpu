@@ -14,7 +14,7 @@ import sys
 #
 # Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
-metodos = ["jacobi", "gauss_seidel_red_black", "successive_over_relaxation_red_black"]
+metodos = ["jacobi", "gauss_seidel", "gauss_seidel_red_black", "successive_over_relaxation_red_black"]
 
 parser = argparse.ArgumentParser()
 parser.add_argument("metodo", choices=metodos)
