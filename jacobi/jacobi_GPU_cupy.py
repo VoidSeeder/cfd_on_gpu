@@ -3,6 +3,17 @@ import sys
 import time
 # import matplotlib.pyplot as plt
 
+# Conta de um volume interno a partir dos coeficientes e dos quatro vizinhos.
+# O CuPy funde as operações da função em um kernel só
+@cp.fuse()
+def atualiza(aw, pw, ae, pe, a_s, ps, an, pn, bp, ap):
+    return (- aw * pw - ae * pe + (- a_s * ps - an * pn) + bp) / ap
+
+# Conta de um volume de face, com três vizinhos, gravada direto no vetor
+@cp.fuse()
+def atualiza_face(p, a1, p1, a2, p2, a3, p3, bp, ap):
+    p[...] = (- a1 * p1 - a2 * p2 - a3 * p3 + bp) / ap
+
 # Início da medição do tempo de alocação
 cp.cuda.Device().synchronize()
 start_allocation_time = time.perf_counter()
@@ -116,6 +127,19 @@ b = Bp.copy()
 b[::nVolY - 1, ::nVolX - 1] = 0
 norma_b = cp.linalg.norm(b)
 
+# As fatias são criadas uma vez, antes das iterações. Faces Oeste, Leste, Sul
+# e Norte: os volumes a atualizar e os argumentos da conta
+faces = [
+    (phi_new[1:-1, 0], Ae[1:-1, 0], phi_new[1:-1, 1], As[1:-1, 0], phi_new[:-2, 0], An[1:-1, 0], phi_new[2:, 0], Bp[1:-1, 0], Ap[1:-1, 0]),
+    (phi_new[1:-1, -1], Aw[1:-1, -1], phi_new[1:-1, -2], As[1:-1, -1], phi_new[:-2, -1], An[1:-1, -1], phi_new[2:, -1], Bp[1:-1, -1], Ap[1:-1, -1]),
+    (phi_new[0, 1:-1], Aw[0, 1:-1], phi_new[0, :-2], Ae[0, 1:-1], phi_new[0, 2:], An[0, 1:-1], phi_new[1, 1:-1], Bp[0, 1:-1], Ap[0, 1:-1]),
+    (phi_new[-1, 1:-1], Aw[-1, 1:-1], phi_new[-1, :-2], Ae[-1, 1:-1], phi_new[-1, 2:], As[-1, 1:-1], phi_new[-2, 1:-1], Bp[-1, 1:-1], Ap[-1, 1:-1]),
+]
+
+# Volumes internos
+volumes = phi_new[1:-1, 1:-1]
+argumentos_internos = (Aw[1:-1, 1:-1], phi_new[1:-1, :-2], Ae[1:-1, 1:-1], phi_new[1:-1, 2:], As[1:-1, 1:-1], phi_new[:-2, 1:-1], An[1:-1, 1:-1], phi_new[2:, 1:-1], Bp[1:-1, 1:-1], Ap[1:-1, 1:-1])
+
 print("=> Início das iterações")
 
 # A primeira iteração serve de aquecimento e é descartada
@@ -126,49 +150,15 @@ end_allocation_time = time.perf_counter()
 start_iteration_time = end_allocation_time
 
 while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
-    # Atualiza as bordas Oeste
-    phi_new[1:-1, 0] = (
-        - Ae[1:-1, 0] * phi_new[1:-1, 1]
-        - As[1:-1, 0] * phi_new[0:-2, 0]
-        - An[1:-1, 0] * phi_new[2:, 0]
-        + Bp[1:-1, 0]
-    ) / Ap[1:-1, 0]
-    
-    # Atualiza as bordas Leste
-    phi_new[1:-1, -1] = (
-        - Aw[1:-1, -1] * phi_new[1:-1, -2]
-        - As[1:-1, -1] * phi_new[0:-2, -1]
-        - An[1:-1, -1] * phi_new[2:, -1]
-        + Bp[1:-1, -1]
-    ) / Ap[1:-1, -1]
+    # Faces Oeste, Leste, Sul e Norte. Os vizinhos que ficam na própria face têm
+    # coeficiente nulo, então a conta pode ser gravada direto no vetor
+    for argumentos in faces:
+        atualiza_face(*argumentos)
 
-    # Atualiza as bordas Sul
-    phi_new[0, 1:-1] = (
-        - Aw[0, 1:-1] * phi_new[0, 0:-2]
-        - Ae[0, 1:-1] * phi_new[0, 2:]
-        - An[0, 1:-1] * phi_new[1, 1:-1]
-        + Bp[0, 1:-1]
-    ) / Ap[0, 1:-1]
+    # Volumes internos. A conta inteira é feita com os valores da iteração
+    # anterior e só depois gravada no vetor
+    volumes[...] = atualiza(*argumentos_internos)
 
-    # Atualiza as bordas Norte
-    phi_new[-1, 1:-1] = (
-        - Aw[-1, 1:-1] * phi_new[-1, 0:-2]
-        - Ae[-1, 1:-1] * phi_new[-1, 2:]
-        - As[-1, 1:-1] * phi_new[-2, 1:-1]
-        + Bp[-1, 1:-1]
-    ) / Ap[-1, 1:-1]
-        
-    # Atualização vetorizada para todas as células
-    phi_new[1:-1, 1:-1] =cp.divide(
-        cp.add(
-            cp.add(
-                cp.add(cp.negative(cp.multiply(Aw[1:-1, 1:-1], phi_new[1:-1, :-2])),
-                       cp.negative(cp.multiply(Ae[1:-1, 1:-1], phi_new[1:-1, 2:]))),
-                cp.add(cp.negative(cp.multiply(As[1:-1, 1:-1], phi_new[:-2, 1:-1])),
-                       cp.negative(cp.multiply(An[1:-1, 1:-1], phi_new[2:, 1:-1])))),
-            Bp[1:-1, 1:-1]),
-        Ap[1:-1, 1:-1])
-            
     # Resíduo real do sistema linear: ||b - A*phi|| / ||b||
     res = Bp - Ap * phi_new
     res[:, 1:] -= Aw[:, 1:] * phi_new[:, :-1]

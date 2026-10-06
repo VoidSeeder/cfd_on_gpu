@@ -3,6 +3,17 @@ import sys
 import time
 # import matplotlib.pyplot as plt
 
+# Conta de um volume interno a partir dos coeficientes e dos quatro vizinhos,
+# gravada direto no vetor. O CuPy funde as operações da função em um kernel só
+@cp.fuse()
+def atualiza(p, aw, pw, ae, pe, a_s, ps, an, pn, bp, ap):
+    p[...] = (- aw * pw - ae * pe - a_s * ps - an * pn + bp) / ap
+
+# Conta de um volume de face, com três vizinhos, gravada direto no vetor
+@cp.fuse()
+def atualiza_face(p, a1, p1, a2, p2, a3, p3, bp, ap):
+    p[...] = (- a1 * p1 - a2 * p2 - a3 * p3 + bp) / ap
+
 # Início da medição do tempo de alocação
 cp.cuda.Device().synchronize()
 start_allocation_time = time.perf_counter()
@@ -116,6 +127,33 @@ b = Bp.copy()
 b[::nVolY - 1, ::nVolX - 1] = 0
 norma_b = cp.linalg.norm(b)
 
+# As fatias de cada cor são criadas uma vez, antes das iterações: para os
+# volumes internos (linhas ímpares e depois linhas pares) e para as faces
+# Oeste, Leste, Sul e Norte, os volumes a atualizar e os argumentos da conta
+internos = []
+faces = []
+
+for cor in (0, 1):
+    internos.append([])
+
+    for i in (1, 2):
+        j = 2 - (cor + i) % 2
+        internos[cor].append((phi_new[i:-1:2, j:-1:2], Aw[i:-1:2, j:-1:2], phi_new[i:-1:2, j - 1:-2:2], Ae[i:-1:2, j:-1:2], phi_new[i:-1:2, j + 1::2], As[i:-1:2, j:-1:2], phi_new[i - 1:-2:2, j:-1:2], An[i:-1:2, j:-1:2], phi_new[i + 1::2, j:-1:2], Bp[i:-1:2, j:-1:2], Ap[i:-1:2, j:-1:2]))
+
+    faces.append([])
+
+    i = 2 - cor
+    faces[cor].append((phi_new[i:-1:2, 0], Ae[i:-1:2, 0], phi_new[i:-1:2, 1], As[i:-1:2, 0], phi_new[i - 1:-2:2, 0], An[i:-1:2, 0], phi_new[i + 1::2, 0], Bp[i:-1:2, 0], Ap[i:-1:2, 0]))
+
+    i = 2 - (cor + nVolX - 1) % 2
+    faces[cor].append((phi_new[i:-1:2, -1], Aw[i:-1:2, -1], phi_new[i:-1:2, -2], As[i:-1:2, -1], phi_new[i - 1:-2:2, -1], An[i:-1:2, -1], phi_new[i + 1::2, -1], Bp[i:-1:2, -1], Ap[i:-1:2, -1]))
+
+    j = 2 - cor
+    faces[cor].append((phi_new[0, j:-1:2], Aw[0, j:-1:2], phi_new[0, j - 1:-2:2], Ae[0, j:-1:2], phi_new[0, j + 1::2], An[0, j:-1:2], phi_new[1, j:-1:2], Bp[0, j:-1:2], Ap[0, j:-1:2]))
+
+    j = 2 - (cor + nVolY - 1) % 2
+    faces[cor].append((phi_new[-1, j:-1:2], Aw[-1, j:-1:2], phi_new[-1, j - 1:-2:2], Ae[-1, j:-1:2], phi_new[-1, j + 1::2], As[-1, j:-1:2], phi_new[-2, j:-1:2], Bp[-1, j:-1:2], Ap[-1, j:-1:2]))
+
 print("=> Início das iterações")
 
 # A primeira iteração serve de aquecimento e é descartada
@@ -129,52 +167,13 @@ while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_itera
     # Volumes vermelhos (i + j par) e depois pretos (i + j ímpar).
     # Os vizinhos de um volume são sempre da outra cor.
     for cor in (0, 1):
-        # Face oeste
-        i = 2 - cor
-        phi_new[i:-1:2, 0] = (
-            - Ae[i:-1:2, 0] * phi_new[i:-1:2, 1]
-            - As[i:-1:2, 0] * phi_new[i - 1:-2:2, 0]
-            - An[i:-1:2, 0] * phi_new[i + 1::2, 0]
-            + Bp[i:-1:2, 0]
-        ) / Ap[i:-1:2, 0]
+        # Faces
+        for argumentos in faces[cor]:
+            atualiza_face(*argumentos)
 
-        # Face leste
-        i = 2 - (cor + nVolX - 1) % 2
-        phi_new[i:-1:2, -1] = (
-            - Aw[i:-1:2, -1] * phi_new[i:-1:2, -2]
-            - As[i:-1:2, -1] * phi_new[i - 1:-2:2, -1]
-            - An[i:-1:2, -1] * phi_new[i + 1::2, -1]
-            + Bp[i:-1:2, -1]
-        ) / Ap[i:-1:2, -1]
-
-        # Face sul
-        j = 2 - cor
-        phi_new[0, j:-1:2] = (
-            - Aw[0, j:-1:2] * phi_new[0, j - 1:-2:2]
-            - Ae[0, j:-1:2] * phi_new[0, j + 1::2]
-            - An[0, j:-1:2] * phi_new[1, j:-1:2]
-            + Bp[0, j:-1:2]
-        ) / Ap[0, j:-1:2]
-
-        # Face norte
-        j = 2 - (cor + nVolY - 1) % 2
-        phi_new[-1, j:-1:2] = (
-            - Aw[-1, j:-1:2] * phi_new[-1, j - 1:-2:2]
-            - Ae[-1, j:-1:2] * phi_new[-1, j + 1::2]
-            - As[-1, j:-1:2] * phi_new[-2, j:-1:2]
-            + Bp[-1, j:-1:2]
-        ) / Ap[-1, j:-1:2]
-
-        # Volumes internos: linhas ímpares e depois linhas pares
-        for i in (1, 2):
-            j = 2 - (cor + i) % 2
-            phi_new[i:-1:2, j:-1:2] = (
-                - Aw[i:-1:2, j:-1:2] * phi_new[i:-1:2, j - 1:-2:2]
-                - Ae[i:-1:2, j:-1:2] * phi_new[i:-1:2, j + 1::2]
-                - As[i:-1:2, j:-1:2] * phi_new[i - 1:-2:2, j:-1:2]
-                - An[i:-1:2, j:-1:2] * phi_new[i + 1::2, j:-1:2]
-                + Bp[i:-1:2, j:-1:2]
-            ) / Ap[i:-1:2, j:-1:2]
+        # Volumes internos
+        for argumentos in internos[cor]:
+            atualiza(*argumentos)
 
     # Resíduo real do sistema linear: ||b - A*phi|| / ||b||
     res = Bp - Ap * phi_new
