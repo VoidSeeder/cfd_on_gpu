@@ -23,17 +23,6 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
 
     int i, j;
 
-    // Dentro dos laços paralelos os vetores são lidos por ponteiros locais:
-    // com as referências, o compilador recarrega o endereço dos dados a cada
-    // acesso
-    const double* pAp = Ap.data();
-    const double* pAw = Aw.data();
-    const double* pAe = Ae.data();
-    const double* pAs = As.data();
-    const double* pAn = An.data();
-    const double* pBp = Bp.data();
-    double* pPhiNew = phi_new.data();
-
     // Volumes vermelhos (i + j par) e depois pretos (i + j ímpar). Os vizinhos
     // de um volume são sempre da outra cor
     for (int cor = 0; cor < 2; cor++) {
@@ -87,11 +76,11 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
         #pragma omp parallel for private(j)
         for (i = 1; i < nVolY - 1; i++) {
             for (j = 2 - (cor + i) % 2; j < nVolX - 1; j += 2) {
-                pPhiNew[p(i, j)] = (- pAw[p(i, j)] * pPhiNew[p(i, j - 1)]
-                    - pAe[p(i, j)] * pPhiNew[p(i, j + 1)]
-                    - pAs[p(i, j)] * pPhiNew[p(i - 1, j)]
-                    - pAn[p(i, j)] * pPhiNew[p(i + 1, j)]
-                    + pBp[p(i, j)]) / pAp[p(i, j)];
+                phi_new[p(i, j)] = (- Aw[p(i, j)] * phi_new[p(i, j - 1)]
+                    - Ae[p(i, j)] * phi_new[p(i, j + 1)]
+                    - As[p(i, j)] * phi_new[p(i - 1, j)]
+                    - An[p(i, j)] * phi_new[p(i + 1, j)]
+                    + Bp[p(i, j)]) / Ap[p(i, j)];
             }
         }
     }
@@ -109,17 +98,17 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
         if (i == 0 || i == nVolY - 1) {
             // Linhas das faces Sul e Norte, sem os cantos
             for (j = 1; j < nVolX - 1; j++) {
-                double res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+                double res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
 
-                res -= pAw[p(i, j)] * pPhiNew[p(i, j - 1)];
-                res -= pAe[p(i, j)] * pPhiNew[p(i, j + 1)];
+                res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
+                res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
 
                 if (i > 0) {
-                    res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
+                    res -= As[p(i, j)] * phi_new[p(i - 1, j)];
                 }
 
                 if (i < nVolY - 1) {
-                    res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
+                    res -= An[p(i, j)] * phi_new[p(i + 1, j)];
                 }
 
                 soma += res * res;
@@ -130,33 +119,33 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
 
         // Face Oeste
         j = 0;
-        double res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+        double res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
 
-        res -= pAe[p(i, j)] * pPhiNew[p(i, j + 1)];
-        res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
-        res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
+        res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
+        res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+        res -= An[p(i, j)] * phi_new[p(i + 1, j)];
 
         soma += res * res;
 
         // Volumes internos
         for (j = 1; j < nVolX - 1; j++) {
-            res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+            res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
 
-            res -= pAw[p(i, j)] * pPhiNew[p(i, j - 1)];
-            res -= pAe[p(i, j)] * pPhiNew[p(i, j + 1)];
-            res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
-            res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
+            res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
+            res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
+            res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+            res -= An[p(i, j)] * phi_new[p(i + 1, j)];
 
             soma += res * res;
         }
 
         // Face Leste
         j = nVolX - 1;
-        res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+        res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
 
-        res -= pAw[p(i, j)] * pPhiNew[p(i, j - 1)];
-        res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
-        res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
+        res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
+        res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+        res -= An[p(i, j)] * phi_new[p(i + 1, j)];
 
         soma += res * res;
     }
