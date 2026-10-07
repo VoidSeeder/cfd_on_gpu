@@ -19,7 +19,7 @@ OMPFLAGS = $(CXXFLAGS) -fopenmp
 NVCC = /usr/local/cuda/bin/nvcc
 CUDAFLAGS = -O3 -std=c++17 --fmad=false -Xcompiler -march=native,-ffp-contract=off
 
-EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp build/gauss_seidel_CPU_openmp build/gauss_seidel_red_black_CPU_openmp build/successive_over_relaxation_red_black_CPU_openmp build/jacobi_GPU build/gauss_seidel_red_black_GPU
+EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp build/gauss_seidel_CPU_openmp build/gauss_seidel_red_black_CPU_openmp build/successive_over_relaxation_red_black_CPU_openmp build/jacobi_GPU build/gauss_seidel_red_black_GPU build/successive_over_relaxation_red_black_GPU
 
 all: $(EXECUTAVEIS)
 
@@ -61,6 +61,10 @@ build/jacobi_GPU: jacobi/jacobi_GPU.cu Makefile
 	$(NVCC) $(CUDAFLAGS) -DOPCOES='"$(CUDAFLAGS)"' -o $@ $<
 
 build/gauss_seidel_red_black_GPU: gauss_seidel_red_black/gauss_seidel_red_black_GPU.cu Makefile
+	@mkdir -p build
+	$(NVCC) $(CUDAFLAGS) -DOPCOES='"$(CUDAFLAGS)"' -o $@ $<
+
+build/successive_over_relaxation_red_black_GPU: successive_over_relaxation_red_black/successive_over_relaxation_red_black_GPU.cu Makefile
 	@mkdir -p build
 	$(NVCC) $(CUDAFLAGS) -DOPCOES='"$(CUDAFLAGS)"' -o $@ $<
 
