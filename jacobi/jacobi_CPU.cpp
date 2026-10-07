@@ -91,34 +91,65 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
 
     // Resíduo real do sistema linear: ||b - A*phi|| / ||b||
     // (os cantos fantasmas não fazem parte do sistema)
+    // O laço das colunas não testa em que face o volume está: as linhas das
+    // faces Sul e Norte são tratadas à parte e, nas demais, as faces Oeste e
+    // Leste ficam fora do laço. A ordem da soma não muda
     double soma = 0.0;
 
     for (i = 0; i < nVolY; i++) {
-        for (j = 0; j < nVolX; j++) {
-            if ((i == 0 || i == nVolY - 1) && (j == 0 || j == nVolX - 1)) {
-                continue;
-            }
+        if (i == 0 || i == nVolY - 1) {
+            // Linhas das faces Sul e Norte, sem os cantos
+            for (j = 1; j < nVolX - 1; j++) {
+                double res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
 
-            double res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
-
-            if (j > 0) {
                 res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
-            }
-
-            if (j < nVolX - 1) {
                 res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
+
+                if (i > 0) {
+                    res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+                }
+
+                if (i < nVolY - 1) {
+                    res -= An[p(i, j)] * phi_new[p(i + 1, j)];
+                }
+
+                soma += res * res;
             }
 
-            if (i > 0) {
-                res -= As[p(i, j)] * phi_new[p(i - 1, j)];
-            }
+            continue;
+        }
 
-            if (i < nVolY - 1) {
-                res -= An[p(i, j)] * phi_new[p(i + 1, j)];
-            }
+        // Face Oeste
+        j = 0;
+        double res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
+
+        res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
+        res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+        res -= An[p(i, j)] * phi_new[p(i + 1, j)];
+
+        soma += res * res;
+
+        // Volumes internos
+        for (j = 1; j < nVolX - 1; j++) {
+            res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
+
+            res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
+            res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
+            res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+            res -= An[p(i, j)] * phi_new[p(i + 1, j)];
 
             soma += res * res;
         }
+
+        // Face Leste
+        j = nVolX - 1;
+        res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
+
+        res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
+        res -= As[p(i, j)] * phi_new[p(i - 1, j)];
+        res -= An[p(i, j)] * phi_new[p(i + 1, j)];
+
+        soma += res * res;
     }
 
     return std::sqrt(soma) / norma_b;
