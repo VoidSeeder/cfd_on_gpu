@@ -13,7 +13,7 @@ CXXFLAGS = -O3 -march=native -std=c++17 -ffp-contract=off
 # Versões com OpenMP: as mesmas opções, mais a que ativa as diretivas
 OMPFLAGS = $(CXXFLAGS) -fopenmp
 
-EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp
+EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp build/gauss_seidel_red_black_CPU_openmp
 
 all: $(EXECUTAVEIS)
 
@@ -35,6 +35,10 @@ build/successive_over_relaxation_red_black_CPU: successive_over_relaxation_red_b
 	$(CXX) $(CXXFLAGS) -DOPCOES='"$(CXXFLAGS)"' -o $@ $<
 
 build/jacobi_CPU_openmp: jacobi/jacobi_CPU_openmp.cpp Makefile
+	@mkdir -p build
+	$(CXX) $(OMPFLAGS) -DOPCOES='"$(OMPFLAGS)"' -o $@ $<
+
+build/gauss_seidel_red_black_CPU_openmp: gauss_seidel_red_black/gauss_seidel_red_black_CPU_openmp.cpp Makefile
 	@mkdir -p build
 	$(CXX) $(OMPFLAGS) -DOPCOES='"$(OMPFLAGS)"' -o $@ $<
 
