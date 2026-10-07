@@ -10,12 +10,16 @@ CXX = g++
 # que mudaria o arredondamento em relação às versões em Python
 CXXFLAGS = -O3 -march=native -std=c++17 -ffp-contract=off
 
-EXECUTAVEIS = build/jacobi_CPU
+EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU
 
 all: $(EXECUTAVEIS)
 
 # As opções de compilação ficam gravadas no executável (--compilacao)
 build/jacobi_CPU: jacobi/jacobi_CPU.cpp Makefile
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -DOPCOES='"$(CXXFLAGS)"' -o $@ $<
+
+build/gauss_seidel_CPU: gauss_seidel/gauss_seidel_CPU.cpp Makefile
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -DOPCOES='"$(CXXFLAGS)"' -o $@ $<
 
