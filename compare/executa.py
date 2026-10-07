@@ -11,6 +11,7 @@ import sys
 # tempos em um arquivo.
 # Cada execução é um processo novo do script do método, que informa o próprio
 # tempo na linha "=> Resultado: ..."
+# As versões em C++ precisam estar compiladas (make, na pasta acima desta)
 #
 # Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
@@ -19,7 +20,7 @@ metodos = ["jacobi", "gauss_seidel", "gauss_seidel_red_black", "successive_over_
 parser = argparse.ArgumentParser()
 parser.add_argument("metodo", choices=metodos)
 parser.add_argument("plataforma", choices=["CPU", "GPU"])
-parser.add_argument("abordagem", choices=["numpy", "cupy", "numba"])
+parser.add_argument("abordagem", choices=["numpy", "cupy", "numba", "serial"])
 parser.add_argument("--inicio", type=int, required=True, help="primeiro nVolY")
 parser.add_argument("--fim", type=int, required=True, help="último nVolY")
 parser.add_argument("--passo", type=int, required=True, help="incremento do nVolY")
@@ -28,10 +29,23 @@ parser.add_argument("--saida", default=".", help="pasta do arquivo de saída")
 args = parser.parse_args()
 
 raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}_{args.abordagem}.py")
+
+if args.abordagem == "serial":
+  # C++ serial: o arquivo não leva o nome da abordagem
+  script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}.cpp")
+  executavel = os.path.join(raiz, "build", f"{args.metodo}_{args.plataforma}")
+  comando = [executavel]
+else:
+  script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}_{args.abordagem}.py")
+  executavel = None
+  comando = [sys.executable, script]
 
 if not os.path.exists(script):
   parser.error(f"não existe o script {os.path.relpath(script, raiz)}")
+
+# A compilação fica fora da medição: aqui só se confere se ela foi feita
+if executavel and (not os.path.exists(executavel) or os.path.getmtime(executavel) < os.path.getmtime(script)):
+  parser.error(f"{os.path.relpath(executavel, raiz)} não existe ou é mais antigo que {os.path.relpath(script, raiz)}; execute make")
 
 def saida_de(comando):
   try:
@@ -54,6 +68,7 @@ file = open(file_name, "xt")
 file.write(f"# Data: {inicio:%Y-%m-%d %H:%M:%S}\n")
 file.write(f"# Comando: {' '.join(sys.argv)}\n")
 file.write(f"# Script: {os.path.relpath(script, raiz)}\n")
+file.write(f"# Compilacao: {saida_de(comando + ['--compilacao']) if executavel else '-'}\n")
 file.write(f"# Commit: {saida_de(['git', 'rev-parse', 'HEAD'])}\n")
 file.write(f"# Alteracoes nao commitadas: {saida_de(['git', 'status', '--short']) or 'nenhuma'}\n")
 file.write(f"# Sistema: {platform.platform()}\n")
@@ -73,7 +88,7 @@ file.close()
 
 for nVolY in range(args.inicio, args.fim + 1, args.passo):
   for repeticao in range(1, args.repeticoes + 1):
-    execucao = subprocess.run([sys.executable, script, str(nVolY)], capture_output=True, text=True)
+    execucao = subprocess.run(comando + [str(nVolY)], capture_output=True, text=True)
 
     resultado = [l for l in execucao.stdout.splitlines() if l.startswith("=> Resultado:")]
 
