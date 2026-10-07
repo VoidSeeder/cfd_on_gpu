@@ -35,34 +35,24 @@ nVolY = int(sys.argv[1]) if len(sys.argv) > 1 else 400
 # Configuração da malha
 R = D / 2
 dx = D / nVolY
+
+# Centros dos volumes na direção y. A solução não depende da posição em x
 y = cp.linspace(-R - dx / 2, R + dx / 2, nVolY + 2)
 
 nVolX = int(cp.round(L / dx))
 L = nVolX * dx
-x = cp.linspace(0 - dx / 2, L + dx / 2, nVolX + 2)
 
 nVolX += 2
 nVolY += 2
 
-X, Y = cp.meshgrid(x, y)
-
-# Campo de velocidade
+# Campo de velocidade: só depende de y, e é o mesmo nas faces Oeste e Leste e
+# no centro do volume. Não há velocidade na direção y
 dPdx = (Pout - Pin) / L
 
-xw = X - dx / 2
-yw = Y
-uw = 1 / (4 * mu) * (-dPdx) * (R**2 - yw**2)
+u = 1 / (4 * mu) * (-dPdx) * (R**2 - y**2)
 
-xe = X + dx / 2
-ye = Y
-ue = 1 / (4 * mu) * (-dPdx) * (R**2 - ye**2)
-
-vs = cp.zeros_like(Y)
-vn = cp.zeros_like(Y)
-
-up = 1 / (4 * mu) * (-dPdx) * (R**2 - Y**2)
-vp = cp.zeros_like(Y)
-Vp = cp.sqrt(up**2 + vp**2)
+vs = 0.0
+vn = 0.0
 
 # Coeficientes da equação de temperatura
 Ap = cp.zeros((nVolY, nVolX))
@@ -104,13 +94,15 @@ As[-1, :] = 1
 An[-1, :] = 0
 Bp[-1, :] = 2 * Twall
 
-# Volumes internos
-Ap[1:-1, 1:-1] = dx * rho * (- cp.minimum(0, uw[1:-1, 1:-1]) + cp.maximum(0, ue[1:-1, 1:-1]) - cp.minimum(0, vs[1:-1, 1:-1]) + cp.maximum(0, vn[1:-1, 1:-1])) + 4 * Gamma
+# Volumes internos: a velocidade de cada linha vale para todas as colunas
+ui = u[1:-1, None]
 
-Aw[1:-1, 1:-1] = -dx * rho * cp.maximum(0, uw[1:-1, 1:-1]) - Gamma
-Ae[1:-1, 1:-1] = dx * rho * cp.minimum(0, ue[1:-1, 1:-1]) - Gamma
-As[1:-1, 1:-1] = -dx * rho * cp.maximum(0, vs[1:-1, 1:-1]) - Gamma
-An[1:-1, 1:-1] = dx * rho * cp.minimum(0, vn[1:-1, 1:-1]) - Gamma
+Ap[1:-1, 1:-1] = dx * rho * (- cp.minimum(0, ui) + cp.maximum(0, ui) - min(0, vs) + max(0, vn)) + 4 * Gamma
+
+Aw[1:-1, 1:-1] = -dx * rho * cp.maximum(0, ui) - Gamma
+Ae[1:-1, 1:-1] = dx * rho * cp.minimum(0, ui) - Gamma
+As[1:-1, 1:-1] = -dx * rho * max(0, vs) - Gamma
+An[1:-1, 1:-1] = dx * rho * min(0, vn) - Gamma
 Bp[1:-1, 1:-1] = 0
 
 # Solução inicial de phi
@@ -193,6 +185,8 @@ print(f"=> Resultado: nVolY={nVolY - 2}"
       f" estado={estado}")
 
 # Exibição dos resultados
+# x = cp.linspace(0 - dx / 2, L + dx / 2, nVolX)
+# X, Y = cp.meshgrid(x, y)
 # plt.figure()
 # plt.contourf(
 #     cp.asnumpy(X[1:-1, 1:-1]),
