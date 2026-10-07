@@ -13,7 +13,13 @@ CXXFLAGS = -O3 -march=native -std=c++17 -ffp-contract=off
 # Versões com OpenMP: as mesmas opções, mais a que ativa as diretivas
 OMPFLAGS = $(CXXFLAGS) -fopenmp
 
-EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp build/gauss_seidel_CPU_openmp build/gauss_seidel_red_black_CPU_openmp build/successive_over_relaxation_red_black_CPU_openmp
+# Versões em CUDA: o nvcc compila os kernels e entrega o resto ao g++, com as
+# mesmas opções (-Xcompiler). --fmad=false: o mesmo que -ffp-contract=off, nos
+# kernels
+NVCC = /usr/local/cuda/bin/nvcc
+CUDAFLAGS = -O3 -std=c++17 --fmad=false -Xcompiler -march=native,-ffp-contract=off
+
+EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp build/gauss_seidel_CPU_openmp build/gauss_seidel_red_black_CPU_openmp build/successive_over_relaxation_red_black_CPU_openmp build/jacobi_GPU
 
 all: $(EXECUTAVEIS)
 
@@ -49,6 +55,10 @@ build/gauss_seidel_red_black_CPU_openmp: gauss_seidel_red_black/gauss_seidel_red
 build/successive_over_relaxation_red_black_CPU_openmp: successive_over_relaxation_red_black/successive_over_relaxation_red_black_CPU_openmp.cpp Makefile
 	@mkdir -p build
 	$(CXX) $(OMPFLAGS) -DOPCOES='"$(OMPFLAGS)"' -o $@ $<
+
+build/jacobi_GPU: jacobi/jacobi_GPU.cu Makefile
+	@mkdir -p build
+	$(NVCC) $(CUDAFLAGS) -DOPCOES='"$(CUDAFLAGS)"' -o $@ $<
 
 clean:
 	rm -rf build

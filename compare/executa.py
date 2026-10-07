@@ -11,7 +11,8 @@ import sys
 # tempos em um arquivo.
 # Cada execução é um processo novo do script do método, que informa o próprio
 # tempo na linha "=> Resultado: ..."
-# As versões em C++ precisam estar compiladas (make, na pasta acima desta)
+# As versões em C++ e em CUDA precisam estar compiladas (make, na pasta acima
+# desta)
 #
 # Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
@@ -20,7 +21,7 @@ metodos = ["jacobi", "gauss_seidel", "gauss_seidel_red_black", "successive_over_
 parser = argparse.ArgumentParser()
 parser.add_argument("metodo", choices=metodos)
 parser.add_argument("plataforma", choices=["CPU", "GPU"])
-parser.add_argument("abordagem", choices=["numpy", "cupy", "numba", "serial", "openmp"])
+parser.add_argument("abordagem", choices=["numpy", "cupy", "numba", "serial", "openmp", "cuda"])
 parser.add_argument("--inicio", type=int, required=True, help="primeiro nVolY")
 parser.add_argument("--fim", type=int, required=True, help="último nVolY")
 parser.add_argument("--passo", type=int, required=True, help="incremento do nVolY")
@@ -33,6 +34,11 @@ raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if args.abordagem == "serial":
   # C++ serial: o arquivo não leva o nome da abordagem
   script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}.cpp")
+  executavel = os.path.join(raiz, "build", f"{args.metodo}_{args.plataforma}")
+  comando = [executavel]
+elif args.abordagem == "cuda":
+  # CUDA C++: o arquivo também não leva o nome da abordagem
+  script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}.cu")
   executavel = os.path.join(raiz, "build", f"{args.metodo}_{args.plataforma}")
   comando = [executavel]
 elif args.abordagem == "openmp":
