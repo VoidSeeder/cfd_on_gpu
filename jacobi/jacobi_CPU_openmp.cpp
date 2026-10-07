@@ -24,6 +24,18 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
 
     int i, j;
 
+    // Dentro dos laços paralelos os vetores são lidos por ponteiros locais:
+    // com as referências, o compilador recarrega o endereço dos dados a cada
+    // acesso
+    const double* pAp = Ap.data();
+    const double* pAw = Aw.data();
+    const double* pAe = Ae.data();
+    const double* pAs = As.data();
+    const double* pAn = An.data();
+    const double* pBp = Bp.data();
+    double* pPhiOld = phi_old.data();
+    double* pPhiNew = phi_new.data();
+
     // Atualiza as bordas Oeste
     j = 0;
     for (i = 1; i < nVolY - 1; i++) {
@@ -84,46 +96,77 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
     #pragma omp parallel for private(j)
     for (i = 1; i < nVolY - 1; i++) {
         for (j = 1; j < nVolX - 1; j++) {
-            phi_new[p(i, j)] = (- Aw[p(i, j)] * phi_old[p(i, j - 1)]
-                - Ae[p(i, j)] * phi_old[p(i, j + 1)]
-                - As[p(i, j)] * phi_old[p(i - 1, j)]
-                - An[p(i, j)] * phi_old[p(i + 1, j)]
-                + Bp[p(i, j)]) / Ap[p(i, j)];
+            pPhiNew[p(i, j)] = (- pAw[p(i, j)] * pPhiOld[p(i, j - 1)]
+                - pAe[p(i, j)] * pPhiOld[p(i, j + 1)]
+                - pAs[p(i, j)] * pPhiOld[p(i - 1, j)]
+                - pAn[p(i, j)] * pPhiOld[p(i + 1, j)]
+                + pBp[p(i, j)]) / pAp[p(i, j)];
         }
     }
 
     // Resíduo real do sistema linear: ||b - A*phi|| / ||b||
     // (os cantos fantasmas não fazem parte do sistema)
     // Cada thread soma as suas linhas e as somas parciais são somadas no fim
+    // O laço das colunas não testa em que face o volume está: as linhas das
+    // faces Sul e Norte são tratadas à parte e, nas demais, as faces Oeste e
+    // Leste ficam fora do laço. A ordem da soma em cada linha não muda
     double soma = 0.0;
 
     #pragma omp parallel for private(j) reduction(+:soma)
     for (i = 0; i < nVolY; i++) {
-        for (j = 0; j < nVolX; j++) {
-            if ((i == 0 || i == nVolY - 1) && (j == 0 || j == nVolX - 1)) {
-                continue;
+        if (i == 0 || i == nVolY - 1) {
+            // Linhas das faces Sul e Norte, sem os cantos
+            for (j = 1; j < nVolX - 1; j++) {
+                double res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+
+                res -= pAw[p(i, j)] * pPhiNew[p(i, j - 1)];
+                res -= pAe[p(i, j)] * pPhiNew[p(i, j + 1)];
+
+                if (i > 0) {
+                    res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
+                }
+
+                if (i < nVolY - 1) {
+                    res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
+                }
+
+                soma += res * res;
             }
 
-            double res = Bp[p(i, j)] - Ap[p(i, j)] * phi_new[p(i, j)];
+            continue;
+        }
 
-            if (j > 0) {
-                res -= Aw[p(i, j)] * phi_new[p(i, j - 1)];
-            }
+        // Face Oeste
+        j = 0;
+        double res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
 
-            if (j < nVolX - 1) {
-                res -= Ae[p(i, j)] * phi_new[p(i, j + 1)];
-            }
+        res -= pAe[p(i, j)] * pPhiNew[p(i, j + 1)];
+        res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
+        res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
 
-            if (i > 0) {
-                res -= As[p(i, j)] * phi_new[p(i - 1, j)];
-            }
+        soma += res * res;
 
-            if (i < nVolY - 1) {
-                res -= An[p(i, j)] * phi_new[p(i + 1, j)];
-            }
+        // Volumes internos
+        for (j = 1; j < nVolX - 1; j++) {
+            res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+
+            res -= pAw[p(i, j)] * pPhiNew[p(i, j - 1)];
+            res -= pAe[p(i, j)] * pPhiNew[p(i, j + 1)];
+            res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
+            res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
 
             soma += res * res;
         }
+
+        // Face Leste
+        j = nVolX - 1;
+        res = pBp[p(i, j)] - pAp[p(i, j)] * pPhiNew[p(i, j)];
+
+        res -= pAw[p(i, j)] * pPhiNew[p(i, j - 1)];
+        res -= pAs[p(i, j)] * pPhiNew[p(i - 1, j)];
+        res -= pAn[p(i, j)] * pPhiNew[p(i + 1, j)];
+
+        soma += res * res;
     }
 
     return std::sqrt(soma) / norma_b;
