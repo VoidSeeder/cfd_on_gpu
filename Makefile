@@ -10,7 +10,10 @@ CXX = g++
 # que mudaria o arredondamento em relação às versões em Python
 CXXFLAGS = -O3 -march=native -std=c++17 -ffp-contract=off
 
-EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU
+# Versões com OpenMP: as mesmas opções, mais a que ativa as diretivas
+OMPFLAGS = $(CXXFLAGS) -fopenmp
+
+EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp
 
 all: $(EXECUTAVEIS)
 
@@ -30,6 +33,10 @@ build/gauss_seidel_red_black_CPU: gauss_seidel_red_black/gauss_seidel_red_black_
 build/successive_over_relaxation_red_black_CPU: successive_over_relaxation_red_black/successive_over_relaxation_red_black_CPU.cpp Makefile
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -DOPCOES='"$(CXXFLAGS)"' -o $@ $<
+
+build/jacobi_CPU_openmp: jacobi/jacobi_CPU_openmp.cpp Makefile
+	@mkdir -p build
+	$(CXX) $(OMPFLAGS) -DOPCOES='"$(OMPFLAGS)"' -o $@ $<
 
 clean:
 	rm -rf build

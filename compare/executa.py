@@ -20,7 +20,7 @@ metodos = ["jacobi", "gauss_seidel", "gauss_seidel_red_black", "successive_over_
 parser = argparse.ArgumentParser()
 parser.add_argument("metodo", choices=metodos)
 parser.add_argument("plataforma", choices=["CPU", "GPU"])
-parser.add_argument("abordagem", choices=["numpy", "cupy", "numba", "serial"])
+parser.add_argument("abordagem", choices=["numpy", "cupy", "numba", "serial", "openmp"])
 parser.add_argument("--inicio", type=int, required=True, help="primeiro nVolY")
 parser.add_argument("--fim", type=int, required=True, help="último nVolY")
 parser.add_argument("--passo", type=int, required=True, help="incremento do nVolY")
@@ -34,6 +34,10 @@ if args.abordagem == "serial":
   # C++ serial: o arquivo não leva o nome da abordagem
   script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}.cpp")
   executavel = os.path.join(raiz, "build", f"{args.metodo}_{args.plataforma}")
+  comando = [executavel]
+elif args.abordagem == "openmp":
+  script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}_{args.abordagem}.cpp")
+  executavel = os.path.join(raiz, "build", f"{args.metodo}_{args.plataforma}_{args.abordagem}")
   comando = [executavel]
 else:
   script = os.path.join(raiz, args.metodo, f"{args.metodo}_{args.plataforma}_{args.abordagem}.py")
