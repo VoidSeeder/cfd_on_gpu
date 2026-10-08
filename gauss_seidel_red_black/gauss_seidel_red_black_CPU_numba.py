@@ -8,6 +8,8 @@ import time
 # sempre da outra cor, então os volumes de uma mesma cor não dependem uns dos
 # outros e as linhas da malha podem ser divididas entre as threads
 # (NUMBA_NUM_THREADS; sem a variável, todas)
+# Os laços que andam de dois em dois volumes são escritos com while: com
+# range(início, fim, 2) o código compilado pelo Numba fica mais lento
 @njit(parallel=True)
 def iteracao(Ap, Aw, Ae, As, An, Bp, phi_new, norma_b):
     nVolY, nVolX = phi_new.shape
@@ -16,52 +18,62 @@ def iteracao(Ap, Aw, Ae, As, An, Bp, phi_new, norma_b):
     for cor in range(2):
         # Face oeste
         j = 0
-        for i in range(2 - cor, nVolY - 1, 2):
+        i = 2 - cor
+        while i < nVolY - 1:
             phi_new[i, j] = (
                 - Ae[i, j] * phi_new[i, j + 1]
                 - As[i, j] * phi_new[i - 1, j]
                 - An[i, j] * phi_new[i + 1, j]
                 + Bp[i, j]
             ) / Ap[i, j]
+            i += 2
 
         # Face leste
         j = nVolX - 1
-        for i in range(2 - (cor + nVolX - 1) % 2, nVolY - 1, 2):
+        i = 2 - (cor + nVolX - 1) % 2
+        while i < nVolY - 1:
             phi_new[i, j] = (
                 - Aw[i, j] * phi_new[i, j - 1]
                 - As[i, j] * phi_new[i - 1, j]
                 - An[i, j] * phi_new[i + 1, j]
                 + Bp[i, j]
             ) / Ap[i, j]
+            i += 2
 
         # Face sul
         i = 0
-        for j in range(2 - cor, nVolX - 1, 2):
+        j = 2 - cor
+        while j < nVolX - 1:
             phi_new[i, j] = (
                 - Aw[i, j] * phi_new[i, j - 1]
                 - Ae[i, j] * phi_new[i, j + 1]
                 - An[i, j] * phi_new[i + 1, j]
                 + Bp[i, j]
             ) / Ap[i, j]
+            j += 2
 
         # Face norte
         i = nVolY - 1
-        for j in range(2 - (cor + nVolY - 1) % 2, nVolX - 1, 2):
+        j = 2 - (cor + nVolY - 1) % 2
+        while j < nVolX - 1:
             phi_new[i, j] = (
                 - Aw[i, j] * phi_new[i, j - 1]
                 - Ae[i, j] * phi_new[i, j + 1]
                 - As[i, j] * phi_new[i - 1, j]
                 + Bp[i, j]
             ) / Ap[i, j]
+            j += 2
 
         # Volumes internos: em cada linha, só os volumes da cor atual
         for i in prange(1, nVolY - 1):
-            for j in range(2 - (cor + i) % 2, nVolX - 1, 2):
+            j = 2 - (cor + i) % 2
+            while j < nVolX - 1:
                 phi_new[i, j] = (- Aw[i, j] * phi_new[i, j - 1]
                     - Ae[i, j] * phi_new[i, j + 1]
                     - As[i, j] * phi_new[i - 1, j]
                     - An[i, j] * phi_new[i + 1, j]
                     + Bp[i, j]) / Ap[i, j]
+                j += 2
 
     # Resíduo real do sistema linear: ||b - A*phi|| / ||b||
     # (os cantos fantasmas não fazem parte do sistema)
