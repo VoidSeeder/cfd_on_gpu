@@ -77,15 +77,17 @@ double iteracao(int nVolY, int nVolX, const Vetor& Ap, const Vetor& Aw, const Ve
     // (r, c - 1), então os blocos de uma mesma diagonal (r + c constante) não
     // dependem uns dos outros. As diagonais são percorridas em ordem e, dentro
     // do bloco, a varredura é linha a linha: cada volume recebe o mesmo valor
-    // da varredura serial
+    // da varredura serial. Uma região paralela só envolve o laço das
+    // diagonais: as threads esperam o fim de cada diagonal antes da seguinte
     int altura = (nVolY - 2 + omp_get_max_threads() - 1) / omp_get_max_threads();
     int largura = 250;
 
     int n_faixas = (nVolY - 2 + altura - 1) / altura;
     int n_trechos = (nVolX - 2 + largura - 1) / largura;
 
+    #pragma omp parallel private(i, j)
     for (int d = 0; d < n_faixas + n_trechos - 1; d++) {
-        #pragma omp parallel for private(i, j)
+        #pragma omp for
         for (int r = std::max(0, d - (n_trechos - 1)); r <= std::min(n_faixas - 1, d); r++) {
             int c = d - r;
 
