@@ -5,6 +5,7 @@ import os
 import platform
 import subprocess
 import sys
+import time
 
 # Executa o script de um método, em CPU ou GPU e em uma das abordagens, para
 # valores crescentes de nVolY, com várias repetições por malha, e grava os
@@ -18,6 +19,10 @@ import sys
 # processo inteiro: a do processador sempre e a da placa de vídeo nas
 # execuções de GPU. As leituras de cada execução ficam em uma pasta ao lado
 # do arquivo de saída
+#
+# Antes de cada execução de GPU há uma espera (--espera, em segundos), para a
+# placa voltar ao repouso depois da execução anterior. A espera fica fora do
+# tempo e da energia medidos. As execuções de CPU não levam espera
 #
 # Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
@@ -33,7 +38,11 @@ parser.add_argument("--passo", type=int, required=True, help="incremento do nVol
 parser.add_argument("--repeticoes", type=int, default=5)
 parser.add_argument("--saida", default=".", help="pasta do arquivo de saída")
 parser.add_argument("--energia", action="store_true", help="mede a energia de cada execução")
+parser.add_argument("--espera", type=float, default=12.0, help="segundos de espera antes de cada execução de GPU")
 args = parser.parse_args()
+
+# Só as execuções de GPU levam espera
+espera = args.espera if args.plataforma == "GPU" else 0.0
 
 raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -110,6 +119,7 @@ for variavel in ["OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "
   file.write(f"# {variavel}: {os.environ.get(variavel, '')}\n")
 
 file.write(f"# Energia: {'sim' if args.energia else 'nao'}\n")
+file.write(f"# Espera antes de cada execucao (s): {espera:g}\n")
 
 file.write("\n")
 file.write("nVolY - Repeticao - Alocacao - Iteracoes - Numero de iteracoes - Residuo - Estado - Aquecimento - Threads"
@@ -120,6 +130,8 @@ file.close()
 
 for nVolY in range(args.inicio, args.fim + 1, args.passo):
   for repeticao in range(1, args.repeticoes + 1):
+    time.sleep(espera)
+
     execucao = subprocess.run(medidor + comando + [str(nVolY)], capture_output=True, text=True)
 
     resultado = [l for l in execucao.stdout.splitlines() if l.startswith("=> Resultado:")]
