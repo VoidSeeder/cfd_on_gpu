@@ -4,7 +4,9 @@
 # Uso: make          compila tudo
 #      make clean    apaga os executáveis
 
-CXX = g++
+# O nvcc 12.9 só aceita o gcc até a versão 14; o mesmo compilador é usado nas
+# versões de CPU, para todas as versões saírem do mesmo g++
+CXX = g++-14
 
 # -ffp-contract=off: sem fundir multiplicação e soma em uma instrução (FMA), o
 # que mudaria o arredondamento em relação às versões em Python
@@ -15,9 +17,9 @@ OMPFLAGS = $(CXXFLAGS) -fopenmp
 
 # Versões em CUDA: o nvcc compila os kernels e entrega o resto ao g++, com as
 # mesmas opções (-Xcompiler). --fmad=false: o mesmo que -ffp-contract=off, nos
-# kernels
+# kernels. -ccbin: o g++ a que o nvcc entrega o resto
 NVCC = /usr/local/cuda/bin/nvcc
-CUDAFLAGS = -O3 -std=c++17 --fmad=false -Xcompiler -march=native,-ffp-contract=off
+CUDAFLAGS = -O3 -std=c++17 --fmad=false -ccbin $(CXX) -Xcompiler -march=native,-ffp-contract=off
 
 EXECUTAVEIS = build/jacobi_CPU build/gauss_seidel_CPU build/gauss_seidel_red_black_CPU build/successive_over_relaxation_red_black_CPU build/jacobi_CPU_openmp build/gauss_seidel_CPU_openmp build/gauss_seidel_red_black_CPU_openmp build/successive_over_relaxation_red_black_CPU_openmp build/jacobi_GPU build/gauss_seidel_GPU build/gauss_seidel_red_black_GPU build/successive_over_relaxation_red_black_GPU
 
