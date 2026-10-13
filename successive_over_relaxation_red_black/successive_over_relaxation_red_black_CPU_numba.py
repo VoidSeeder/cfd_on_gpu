@@ -202,6 +202,13 @@ residuo_iteracao = 1
 numero_iteracao = 0
 numero_maximo_iteracao = 1000000
 residuo_final = 1e-10
+
+# Com "--iteracoes N", depois do nVolY, são feitas exatamente N iterações: o
+# resíduo continua sendo calculado, mas não encerra o laço
+iteracoes_fixas = "--iteracoes" in sys.argv
+
+if iteracoes_fixas:
+    numero_maximo_iteracao = int(sys.argv[sys.argv.index("--iteracoes") + 1])
 omega = 1.0  # Fator de relaxação (1 = Gauss-Seidel red-black)
 
 # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
@@ -217,7 +224,7 @@ aquecimento = True
 end_allocation_time = time.perf_counter()
 start_iteration_time = end_allocation_time
 
-while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
+while (iteracoes_fixas or residuo_iteracao > residuo_final) and numero_iteracao < numero_maximo_iteracao:
     residuo_iteracao = iteracao(Ap, Aw, Ae, As, An, Bp, phi_new, norma_b, omega)
     numero_iteracao += 1
 
@@ -232,6 +239,9 @@ while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_itera
 end_time = time.perf_counter()
 
 estado = "convergiu" if residuo_iteracao <= residuo_final else "nao_convergiu"
+
+if iteracoes_fixas:
+    estado = "iteracoes_fixas"
 
 print(f"=> Resultado: nVolY={nVolY - 2}"
       f" alocacao={end_allocation_time - start_allocation_time:.6f}"

@@ -215,6 +215,13 @@ numero_iteracao = 0
 numero_maximo_iteracao = 1000000
 residuo_final = 1e-10
 
+# Com "--iteracoes N", depois do nVolY, são feitas exatamente N iterações: o
+# resíduo continua sendo calculado, mas não encerra o laço
+iteracoes_fixas = "--iteracoes" in sys.argv
+
+if iteracoes_fixas:
+    numero_maximo_iteracao = int(sys.argv[sys.argv.index("--iteracoes") + 1])
+
 # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
 b = Bp.copy()
 b[::nVolY - 1, ::nVolX - 1] = 0
@@ -254,7 +261,7 @@ cuda.synchronize()
 end_allocation_time = time.perf_counter()
 start_iteration_time = end_allocation_time
 
-while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
+while (iteracoes_fixas or residuo_iteracao > residuo_final) and numero_iteracao < numero_maximo_iteracao:
     bordas[blocos_1d, threads_1d](Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_old_gpu, phi_new_gpu)
     copia_bordas[blocos_1d, threads_1d](phi_new_gpu, phi_old_gpu)
     internos[blocos_2d, threads_2d](Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_old_gpu, phi_new_gpu)
@@ -285,6 +292,9 @@ end_time = time.perf_counter()
 phi_new = phi_old_gpu.copy_to_host()
 
 estado = "convergiu" if residuo_iteracao <= residuo_final else "nao_convergiu"
+
+if iteracoes_fixas:
+    estado = "iteracoes_fixas"
 
 print(f"=> Resultado: nVolY={nVolY - 2}"
       f" alocacao={end_allocation_time - start_allocation_time:.6f}"

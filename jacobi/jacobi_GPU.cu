@@ -174,7 +174,7 @@ double segundos(std::chrono::steady_clock::time_point inicio, std::chrono::stead
     return std::chrono::duration<double>(fim - inicio).count();
 }
 
-// Uso: jacobi_GPU [nVolY] [arquivo onde gravar o campo final]
+// Uso: jacobi_GPU [nVolY] [--iteracoes N] [arquivo onde gravar o campo final]
 //      jacobi_GPU --compilacao
 int main(int argc, char* argv[]) {
     if (argc > 1 && std::strcmp(argv[1], "--compilacao") == 0) {
@@ -309,6 +309,26 @@ int main(int argc, char* argv[]) {
     int numero_maximo_iteracao = 1000000;
     double residuo_final = 1e-10;
 
+    // Com "--iteracoes N", depois do nVolY, são feitas exatamente N iterações:
+    // o resíduo continua sendo calculado, mas não encerra o laço. A opção sai
+    // da lista de argumentos, para não ser lida como o arquivo do campo
+    bool iteracoes_fixas = false;
+
+    for (int k = 2; k + 1 < argc; k++) {
+        if (std::strcmp(argv[k], "--iteracoes") == 0) {
+            iteracoes_fixas = true;
+            numero_maximo_iteracao = std::atoi(argv[k + 1]);
+
+            for (int m = k; m + 2 < argc; m++) {
+                argv[m] = argv[m + 2];
+            }
+
+            argc -= 2;
+
+            break;
+        }
+    }
+
     // Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
     double norma_b = 0.0;
 
@@ -360,7 +380,7 @@ int main(int argc, char* argv[]) {
     auto start_iteration_time = end_allocation_time;
     auto end_warm_up_time = end_allocation_time;
 
-    while (residuo_iteracao > residuo_final && numero_iteracao < numero_maximo_iteracao) {
+    while ((iteracoes_fixas || residuo_iteracao > residuo_final) && numero_iteracao < numero_maximo_iteracao) {
         bordas<<<blocos_1d, threads_1d>>>(nVolY, nVolX, Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_old_gpu, phi_new_gpu);
         copia_bordas<<<blocos_1d, threads_1d>>>(nVolY, nVolX, phi_new_gpu, phi_old_gpu);
         internos<<<blocos_2d, threads_2d>>>(nVolY, nVolX, Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_old_gpu, phi_new_gpu);
@@ -400,6 +420,10 @@ int main(int argc, char* argv[]) {
     confere(cudaMemcpy(phi_new.data(), phi_old_gpu, tamanho * sizeof(double), cudaMemcpyDeviceToHost), "cópia do campo final");
 
     const char* estado = residuo_iteracao <= residuo_final ? "convergiu" : "nao_convergiu";
+
+    if (iteracoes_fixas) {
+        estado = "iteracoes_fixas";
+    }
 
     std::printf("=> Resultado: nVolY=%d alocacao=%.6f iteracao=%.6f numero_iteracao=%d residuo=%.6e estado=%s aquecimento=%.6f\n",
                 nVolY - 2,

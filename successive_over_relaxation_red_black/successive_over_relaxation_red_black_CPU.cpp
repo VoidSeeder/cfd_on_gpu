@@ -152,7 +152,7 @@ double segundos(std::chrono::steady_clock::time_point inicio, std::chrono::stead
     return std::chrono::duration<double>(fim - inicio).count();
 }
 
-// Uso: successive_over_relaxation_red_black_CPU [nVolY] [arquivo onde gravar o campo final]
+// Uso: successive_over_relaxation_red_black_CPU [nVolY] [--iteracoes N] [arquivo onde gravar o campo final]
 //      successive_over_relaxation_red_black_CPU --compilacao
 int main(int argc, char* argv[]) {
     if (argc > 1 && std::strcmp(argv[1], "--compilacao") == 0) {
@@ -285,6 +285,26 @@ int main(int argc, char* argv[]) {
     int numero_iteracao = 0;
     int numero_maximo_iteracao = 1000000;
     double residuo_final = 1e-10;
+
+    // Com "--iteracoes N", depois do nVolY, são feitas exatamente N iterações:
+    // o resíduo continua sendo calculado, mas não encerra o laço. A opção sai
+    // da lista de argumentos, para não ser lida como o arquivo do campo
+    bool iteracoes_fixas = false;
+
+    for (int k = 2; k + 1 < argc; k++) {
+        if (std::strcmp(argv[k], "--iteracoes") == 0) {
+            iteracoes_fixas = true;
+            numero_maximo_iteracao = std::atoi(argv[k + 1]);
+
+            for (int m = k; m + 2 < argc; m++) {
+                argv[m] = argv[m + 2];
+            }
+
+            argc -= 2;
+
+            break;
+        }
+    }
     double omega = 1.0;  // Fator de relaxação (1 = Gauss-Seidel red-black)
 
     // Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
@@ -307,7 +327,7 @@ int main(int argc, char* argv[]) {
     auto end_allocation_time = std::chrono::steady_clock::now();
     auto start_iteration_time = end_allocation_time;
 
-    while (residuo_iteracao > residuo_final && numero_iteracao < numero_maximo_iteracao) {
+    while ((iteracoes_fixas || residuo_iteracao > residuo_final) && numero_iteracao < numero_maximo_iteracao) {
         residuo_iteracao = iteracao(nVolY, nVolX, Ap, Aw, Ae, As, An, Bp, phi_new, norma_b, omega);
         numero_iteracao += 1;
     }
@@ -315,6 +335,10 @@ int main(int argc, char* argv[]) {
     auto end_time = std::chrono::steady_clock::now();
 
     const char* estado = residuo_iteracao <= residuo_final ? "convergiu" : "nao_convergiu";
+
+    if (iteracoes_fixas) {
+        estado = "iteracoes_fixas";
+    }
 
     std::printf("=> Resultado: nVolY=%d alocacao=%.6f iteracao=%.6f numero_iteracao=%d residuo=%.6e estado=%s\n",
                 nVolY - 2,

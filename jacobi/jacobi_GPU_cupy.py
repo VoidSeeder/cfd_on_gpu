@@ -114,6 +114,13 @@ numero_iteracao = 0
 numero_maximo_iteracao = 1000000
 residuo_final = 1e-10
 
+# Com "--iteracoes N", depois do nVolY, são feitas exatamente N iterações: o
+# resíduo continua sendo calculado, mas não encerra o laço
+iteracoes_fixas = "--iteracoes" in sys.argv
+
+if iteracoes_fixas:
+    numero_maximo_iteracao = int(sys.argv[sys.argv.index("--iteracoes") + 1])
+
 # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
 b = Bp.copy()
 b[::nVolY - 1, ::nVolX - 1] = 0
@@ -141,7 +148,7 @@ cp.cuda.Device().synchronize()
 end_allocation_time = time.perf_counter()
 start_iteration_time = end_allocation_time
 
-while residuo_iteracao > residuo_final and numero_iteracao < numero_maximo_iteracao:
+while (iteracoes_fixas or residuo_iteracao > residuo_final) and numero_iteracao < numero_maximo_iteracao:
     # Faces Oeste, Leste, Sul e Norte. Os vizinhos que ficam na própria face têm
     # coeficiente nulo, então a conta pode ser gravada direto no vetor
     for argumentos in faces:
@@ -176,6 +183,9 @@ cp.cuda.Device().synchronize()
 end_time = time.perf_counter()
 
 estado = "convergiu" if residuo_iteracao <= residuo_final else "nao_convergiu"
+
+if iteracoes_fixas:
+    estado = "iteracoes_fixas"
 
 print(f"=> Resultado: nVolY={nVolY - 2}"
       f" alocacao={end_allocation_time - start_allocation_time:.6f}"
