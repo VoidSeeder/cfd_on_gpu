@@ -4,6 +4,7 @@ import datetime
 import os
 import subprocess
 import sys
+import threading
 import time
 
 # Executa um comando e mede a energia consumida enquanto ele roda: a do
@@ -69,22 +70,36 @@ leituras = [leitura()]
 
 processo = subprocess.Popen(args.comando)
 
-# Leituras em instantes fixos a partir do início, para o intervalo não
-# acumular atraso
-proxima = leituras[0][0] + args.intervalo
+terminou = threading.Event()
 
-while True:
-  try:
-    processo.wait(timeout=max(proxima - time.perf_counter(), 0))
+def leituras_no_intervalo():
+  # Leituras em instantes fixos a partir do início, para o intervalo não
+  # acumular atraso
+  proxima = leituras[0][0] + args.intervalo
 
-    break
-  except subprocess.TimeoutExpired:
+  while not terminou.wait(max(proxima - time.perf_counter(), 0)):
     leituras.append(leitura())
 
     proxima += args.intervalo
 
+# As leituras do intervalo ficam em outra linha de execução, para esta ficar
+# parada até o comando terminar e fazer a leitura do fim sem atraso (a espera
+# com tempo limite confere o fim do comando só a cada 0,05 s)
+intervalo = threading.Thread(target=leituras_no_intervalo)
+
+intervalo.start()
+
+processo.wait()
+
 # Leitura do fim, logo depois de o comando terminar
-leituras.append(leitura())
+fim = leitura()
+
+terminou.set()
+
+intervalo.join()
+
+# Uma leitura do intervalo pode ter caído depois da do fim
+leituras = [valores for valores in leituras if valores[0] < fim[0]] + [fim]
 
 if args.gpu:
   placa_fim = leitura_placa()
