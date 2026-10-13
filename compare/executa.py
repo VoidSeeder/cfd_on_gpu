@@ -14,6 +14,11 @@ import sys
 # As versões em C++ e em CUDA precisam estar compiladas (make, na pasta acima
 # desta)
 #
+# Com --energia, cada execução passa pelo energia.py, que mede a energia do
+# processo inteiro: a do processador sempre e a da placa de vídeo nas
+# execuções de GPU. As leituras de cada execução ficam em uma pasta ao lado
+# do arquivo de saída
+#
 # Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
 metodos = ["jacobi", "gauss_seidel", "gauss_seidel_red_black", "successive_over_relaxation_red_black"]
@@ -27,6 +32,7 @@ parser.add_argument("--fim", type=int, required=True, help="último nVolY")
 parser.add_argument("--passo", type=int, required=True, help="incremento do nVolY")
 parser.add_argument("--repeticoes", type=int, default=5)
 parser.add_argument("--saida", default=".", help="pasta do arquivo de saída")
+parser.add_argument("--energia", action="store_true", help="mede a energia de cada execução")
 args = parser.parse_args()
 
 raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -72,6 +78,19 @@ os.makedirs(args.saida, exist_ok=True)
 
 file_name = os.path.join(args.saida, f"{args.metodo}_{args.plataforma}_{args.abordagem}_{inicio:%Y%m%d_%H%M%S}.txt")
 
+if args.energia:
+  # Pasta das leituras de energia, com o nome do arquivo de saída
+  pasta_energia = file_name[:-len(".txt")] + "_energia"
+
+  medidor = [sys.executable, os.path.join(raiz, "compare", "energia.py"), "--saida", pasta_energia]
+
+  if args.plataforma == "GPU":
+    medidor.append("--gpu")
+
+  medidor.append("--")
+else:
+  medidor = []
+
 # Modo "x": uma execução nova nunca sobrescreve um arquivo existente
 file = open(file_name, "xt")
 
@@ -90,23 +109,34 @@ file.write(f"# GPU: {saida_de(['nvidia-smi', '--query-gpu=name,driver_version', 
 for variavel in ["OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMBA_NUM_THREADS"]:
   file.write(f"# {variavel}: {os.environ.get(variavel, '')}\n")
 
+file.write(f"# Energia: {'sim' if args.energia else 'nao'}\n")
+
 file.write("\n")
-file.write("nVolY - Repeticao - Alocacao - Iteracoes - Numero de iteracoes - Residuo - Estado - Aquecimento - Threads\n")
+file.write("nVolY - Repeticao - Alocacao - Iteracoes - Numero de iteracoes - Residuo - Estado - Aquecimento - Threads"
+           + (" - Duracao do processo - Energia do processador (J) - Energia da placa (J)" if args.energia else "") + "\n")
 file.write("\n")
 
 file.close()
 
 for nVolY in range(args.inicio, args.fim + 1, args.passo):
   for repeticao in range(1, args.repeticoes + 1):
-    execucao = subprocess.run(comando + [str(nVolY)], capture_output=True, text=True)
+    execucao = subprocess.run(medidor + comando + [str(nVolY)], capture_output=True, text=True)
 
     resultado = [l for l in execucao.stdout.splitlines() if l.startswith("=> Resultado:")]
+    energia = [l for l in execucao.stdout.splitlines() if l.startswith("=> Energia:")]
 
-    if resultado:
+    if resultado and (energia or not args.energia):
       # "=> Resultado: nVolY=20 alocacao=0.01 ..." vira um dicionário
       campos = dict(campo.split("=") for campo in resultado[0].split()[2:])
 
-      linha = f"{nVolY} {repeticao} {campos['alocacao']} {campos['iteracao']} {campos['numero_iteracao']} {campos['residuo']} {campos['estado']} {campos.get('aquecimento', '-')} {campos.get('threads', '-')}\n"
+      linha = f"{nVolY} {repeticao} {campos['alocacao']} {campos['iteracao']} {campos['numero_iteracao']} {campos['residuo']} {campos['estado']} {campos.get('aquecimento', '-')} {campos.get('threads', '-')}"
+
+      if args.energia:
+        campos = dict(campo.split("=") for campo in energia[0].split()[2:])
+
+        linha += f" {campos['duracao']} {campos['processador']} {campos.get('placa', '-')}"
+
+      linha += "\n"
     else:
       # Execução que termina sem resultado (por exemplo, falta de memória)
       linha = f"{nVolY} {repeticao} erro: {execucao.stderr.strip().splitlines()[-1:]}\n"
