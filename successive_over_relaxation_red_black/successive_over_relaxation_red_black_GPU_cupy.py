@@ -121,7 +121,18 @@ iteracoes_fixas = "--iteracoes" in sys.argv
 
 if iteracoes_fixas:
     numero_maximo_iteracao = int(sys.argv[sys.argv.index("--iteracoes") + 1])
-omega = 1.0  # Fator de relaxação (1 = Gauss-Seidel red-black)
+
+# Fator de relaxação: com "--omega W", depois do nVolY, o método usa W (sem a
+# opção, 1 = Gauss-Seidel red-black)
+omega = float(sys.argv[sys.argv.index("--omega") + 1]) if "--omega" in sys.argv else 1.0
+
+if not 0 < omega < 2:
+    sys.exit(f"omega={omega:g} fora do intervalo (0, 2)")
+
+# Divergência: o laço para quando o resíduo passa de 1000 vezes o da primeira
+# iteração (com --iteracoes, não para). O limite é definido depois da primeira
+# iteração
+limite_divergencia = float("inf")
 
 # Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
 b = Bp.copy()
@@ -164,7 +175,7 @@ cp.cuda.Device().synchronize()
 end_allocation_time = time.perf_counter()
 start_iteration_time = end_allocation_time
 
-while (iteracoes_fixas or residuo_iteracao > residuo_final) and numero_iteracao < numero_maximo_iteracao:
+while (iteracoes_fixas or residuo_final < float(residuo_iteracao) <= limite_divergencia) and numero_iteracao < numero_maximo_iteracao:
     # Volumes vermelhos (i + j par) e depois pretos (i + j ímpar).
     # Os vizinhos de um volume são sempre da outra cor.
     for cor in (0, 1):
@@ -197,10 +208,19 @@ while (iteracoes_fixas or residuo_iteracao > residuo_final) and numero_iteracao 
         cp.cuda.Device().synchronize()
         start_iteration_time = time.perf_counter()
 
+    if numero_iteracao == 1:
+        limite_divergencia = 1e3 * float(residuo_iteracao)
+
 cp.cuda.Device().synchronize()
 end_time = time.perf_counter()
 
-estado = "convergiu" if residuo_iteracao <= residuo_final else "nao_convergiu"
+if residuo_iteracao <= residuo_final:
+    estado = "convergiu"
+elif not residuo_iteracao <= limite_divergencia:
+    # Um resíduo NaN também conta como divergência
+    estado = "divergiu"
+else:
+    estado = "nao_convergiu"
 
 if iteracoes_fixas:
     estado = "iteracoes_fixas"
@@ -210,7 +230,8 @@ print(f"=> Resultado: nVolY={nVolY - 2}"
       f" iteracao={end_time - start_iteration_time:.6f}"
       f" numero_iteracao={numero_iteracao}"
       f" residuo={float(residuo_iteracao):.6e}"
-      f" estado={estado}")
+      f" estado={estado}"
+      f" omega={omega:g}")
 
 # Exibição dos resultados
 # x = cp.linspace(0 - dx / 2, L + dx / 2, nVolX)

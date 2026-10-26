@@ -169,7 +169,7 @@ double segundos(std::chrono::steady_clock::time_point inicio, std::chrono::stead
     return std::chrono::duration<double>(fim - inicio).count();
 }
 
-// Uso: successive_over_relaxation_red_black_GPU [nVolY] [--iteracoes N] [arquivo onde gravar o campo final]
+// Uso: successive_over_relaxation_red_black_GPU [nVolY] [--iteracoes N] [--omega W] [arquivo onde gravar o campo final]
 //      successive_over_relaxation_red_black_GPU --compilacao
 int main(int argc, char* argv[]) {
     if (argc > 1 && std::strcmp(argv[1], "--compilacao") == 0) {
@@ -305,25 +305,42 @@ int main(int argc, char* argv[]) {
     double residuo_final = 1e-10;
 
     // Com "--iteracoes N", depois do nVolY, são feitas exatamente N iterações:
-    // o resíduo continua sendo calculado, mas não encerra o laço. A opção sai
-    // da lista de argumentos, para não ser lida como o arquivo do campo
+    // o resíduo continua sendo calculado, mas não encerra o laço. Com
+    // "--omega W", o método usa o fator de relaxação W (sem a opção, 1 =
+    // Gauss-Seidel red-black). As opções saem da lista de argumentos, para não
+    // serem lidas como o arquivo do campo
     bool iteracoes_fixas = false;
+    double omega = 1.0;
 
-    for (int k = 2; k + 1 < argc; k++) {
+    for (int k = 2; k + 1 < argc;) {
         if (std::strcmp(argv[k], "--iteracoes") == 0) {
             iteracoes_fixas = true;
             numero_maximo_iteracao = std::atoi(argv[k + 1]);
+        } else if (std::strcmp(argv[k], "--omega") == 0) {
+            omega = std::atof(argv[k + 1]);
+        } else {
+            k++;
 
-            for (int m = k; m + 2 < argc; m++) {
-                argv[m] = argv[m + 2];
-            }
-
-            argc -= 2;
-
-            break;
+            continue;
         }
+
+        for (int m = k; m + 2 < argc; m++) {
+            argv[m] = argv[m + 2];
+        }
+
+        argc -= 2;
     }
-    double omega = 1.0;  // Fator de relaxação (1 = Gauss-Seidel red-black)
+
+    if (!(omega > 0 && omega < 2)) {
+        std::fprintf(stderr, "omega=%g fora do intervalo (0, 2)\n", omega);
+
+        return 1;
+    }
+
+    // Divergência: o laço para quando o resíduo passa de 1000 vezes o da
+    // primeira iteração (com --iteracoes, não para). O limite é definido
+    // depois da primeira iteração
+    double limite_divergencia = HUGE_VAL;
 
     // Norma do termo fonte (os cantos fantasmas não fazem parte do sistema)
     double norma_b = 0.0;
@@ -375,7 +392,7 @@ int main(int argc, char* argv[]) {
     auto start_iteration_time = end_allocation_time;
     auto end_warm_up_time = end_allocation_time;
 
-    while ((iteracoes_fixas || residuo_iteracao > residuo_final) && numero_iteracao < numero_maximo_iteracao) {
+    while ((iteracoes_fixas || (residuo_iteracao > residuo_final && residuo_iteracao <= limite_divergencia)) && numero_iteracao < numero_maximo_iteracao) {
         // Volumes vermelhos (i + j par) e depois pretos (i + j ímpar)
         for (int cor = 0; cor < 2; cor++) {
             bordas<<<blocos_1d, threads_1d>>>(nVolY, nVolX, Ap_gpu, Aw_gpu, Ae_gpu, As_gpu, An_gpu, Bp_gpu, phi_new_gpu, cor, omega);
@@ -407,6 +424,10 @@ int main(int argc, char* argv[]) {
             end_warm_up_time = std::chrono::steady_clock::now();
             start_iteration_time = end_warm_up_time;
         }
+
+        if (numero_iteracao == 1) {
+            limite_divergencia = 1e3 * residuo_iteracao;
+        }
     }
 
     confere(cudaDeviceSynchronize(), "sincronização");
@@ -414,19 +435,23 @@ int main(int argc, char* argv[]) {
 
     confere(cudaMemcpy(phi_new.data(), phi_new_gpu, tamanho * sizeof(double), cudaMemcpyDeviceToHost), "cópia do campo final");
 
-    const char* estado = residuo_iteracao <= residuo_final ? "convergiu" : "nao_convergiu";
+    // Um resíduo NaN também conta como divergência
+    const char* estado = residuo_iteracao <= residuo_final ? "convergiu"
+                       : !(residuo_iteracao <= limite_divergencia) ? "divergiu"
+                       : "nao_convergiu";
 
     if (iteracoes_fixas) {
         estado = "iteracoes_fixas";
     }
 
-    std::printf("=> Resultado: nVolY=%d alocacao=%.6f iteracao=%.6f numero_iteracao=%d residuo=%.6e estado=%s aquecimento=%.6f\n",
+    std::printf("=> Resultado: nVolY=%d alocacao=%.6f iteracao=%.6f numero_iteracao=%d residuo=%.6e estado=%s omega=%g aquecimento=%.6f\n",
                 nVolY - 2,
                 segundos(start_allocation_time, end_allocation_time),
                 segundos(start_iteration_time, end_time),
                 numero_iteracao,
                 residuo_iteracao,
                 estado,
+                omega,
                 segundos(end_allocation_time, end_warm_up_time));
 
     // Grava o campo final (nVolY linhas de nVolX números de 8 bytes)

@@ -27,6 +27,10 @@ import time
 # Com --iteracoes N, cada execução faz exatamente N iterações, sem parar pelo
 # resíduo (o estado informado passa a ser "iteracoes_fixas")
 #
+# Com --omega W, só no SOR, o método usa o fator de relaxação W (sem a opção,
+# o padrão do script, 1). Uma execução que diverge para cedo, com o estado
+# "divergiu"
+#
 # Exemplo: python executa.py jacobi GPU cupy --inicio 20 --fim 100 --passo 20
 
 metodos = ["jacobi", "gauss_seidel", "gauss_seidel_red_black", "successive_over_relaxation_red_black"]
@@ -43,7 +47,13 @@ parser.add_argument("--saida", default=".", help="pasta do arquivo de saída")
 parser.add_argument("--energia", action="store_true", help="mede a energia de cada execução")
 parser.add_argument("--espera", type=float, default=12.0, help="segundos de espera antes de cada execução de GPU")
 parser.add_argument("--iteracoes", type=int, help="número fixo de iterações de cada execução (sem a opção, até convergir)")
+parser.add_argument("--omega", type=float, help="fator de relaxação do SOR (sem a opção, 1)")
 args = parser.parse_args()
+
+sor = args.metodo == "successive_over_relaxation_red_black"
+
+if args.omega is not None and not sor:
+  parser.error("--omega só vale para o successive_over_relaxation_red_black")
 
 # Só as execuções de GPU levam espera
 espera = args.espera if args.plataforma == "GPU" else 0.0
@@ -107,6 +117,9 @@ else:
 # Opção repassada ao script do método
 iteracoes = ["--iteracoes", str(args.iteracoes)] if args.iteracoes is not None else []
 
+# repr() mantém todos os algarismos do valor pedido
+omega = ["--omega", repr(args.omega)] if args.omega is not None else []
+
 # Modo "x": uma execução nova nunca sobrescreve um arquivo existente
 file = open(file_name, "xt")
 
@@ -128,6 +141,7 @@ for variavel in ["OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "
 file.write(f"# Energia: {'sim' if args.energia else 'nao'}\n")
 file.write(f"# Espera antes de cada execucao (s): {espera:g}\n")
 file.write(f"# Iteracoes fixas: {args.iteracoes if args.iteracoes is not None else 'nao'}\n")
+file.write(f"# Omega: {(repr(args.omega) if args.omega is not None else '1 (padrao)') if sor else '-'}\n")
 
 file.write("\n")
 file.write("nVolY - Repeticao - Alocacao - Iteracoes - Numero de iteracoes - Residuo - Estado - Aquecimento - Threads"
@@ -140,7 +154,7 @@ for nVolY in range(args.inicio, args.fim + 1, args.passo):
   for repeticao in range(1, args.repeticoes + 1):
     time.sleep(espera)
 
-    execucao = subprocess.run(medidor + comando + [str(nVolY)] + iteracoes, capture_output=True, text=True)
+    execucao = subprocess.run(medidor + comando + [str(nVolY)] + iteracoes + omega, capture_output=True, text=True)
 
     resultado = [l for l in execucao.stdout.splitlines() if l.startswith("=> Resultado:")]
     energia = [l for l in execucao.stdout.splitlines() if l.startswith("=> Energia:")]
